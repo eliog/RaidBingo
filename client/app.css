@@ -32,6 +32,9 @@
 
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
+/* `hidden` is only display:none in the UA sheet, so any author display rule
+   beats it. Every flex/grid element here would ignore it without this. */
+[hidden]{display:none!important}
 body{
   background:var(--bg); color:var(--ink);
   font-family:"Alegreya Sans","Segoe UI",system-ui,sans-serif;

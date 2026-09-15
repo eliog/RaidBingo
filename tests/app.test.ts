@@ -31,6 +31,15 @@ async function signIn(h: ReturnType<typeof app>, discordUserId = "1099"): Promis
   return cookieFrom(cb.headers["set-cookie"]);
 }
 
+test("the stylesheet makes the hidden attribute actually hide things", async () => {
+  // Without this, `el.hidden = true` is ignored by every flex or grid element,
+  // and it reads as a state bug rather than a css one.
+  const h = app();
+  const res = await h.instance.inject({ method: "GET", url: "/assets/app.css" });
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body, /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/);
+});
+
 test("health check answers", async () => {
   const h = app();
   const res = await h.instance.inject({ method: "GET", url: "/healthz" });
