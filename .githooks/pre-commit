@@ -1,0 +1,24 @@
+#!/bin/sh
+# Enable with: npm run hooks
+#
+# Catches a secret before it reaches history. This matters more than the CI
+# job: once a secret is committed, removing it in a later commit does not
+# remove it from history. Rotation is the only real remediation.
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --verbose || {
+    echo
+    echo "gitleaks found a secret in the staged changes. Nothing was committed."
+    echo "Remove it and re-stage. If it is a false positive, add a narrow"
+    echo "allowlist rule to .gitleaks.toml rather than skipping the hook."
+    exit 1
+  }
+else
+  echo "warning: gitleaks not installed, skipping secret scan."
+  echo "  brew install gitleaks   (or see github.com/gitleaks/gitleaks)"
+fi
+
+if git diff --cached --name-only | grep -qE '(^|/)\.env$|\.(db|sqlite3?)$'; then
+  echo "refusing to commit a .env or database file."
+  exit 1
+fi

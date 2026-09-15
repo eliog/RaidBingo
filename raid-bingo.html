@@ -1,0 +1,1121 @@
+<title>Black Temple Bingo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style>
+  :root {
+    --bg: #E8DFC8;
+    --surface: #F3ECDC;
+    --surface-raised: #FBF6EA;
+    --sunk: #DCD0B2;
+    --ink: #2B2318;
+    --ink-dim: #6E5F47;
+    --ink-faint: #94856B;
+    --line: #C7B794;
+    --line-strong: #A89572;
+    --fel: #46731A;
+    --fel-ink: #FBF6EA;
+    --fel-wash: #DFE9C6;
+    --gold: #8A6524;
+    --gold-wash: #EDDFBC;
+    --shadow: 0 1px 2px rgba(43, 35, 24, .10), 0 6px 16px -8px rgba(43, 35, 24, .22);
+    --glow: none;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14101A;
+      --surface: #1E1825;
+      --surface-raised: #2A2233;
+      --sunk: #171220;
+      --ink: #E8DFC8;
+      --ink-dim: #A293AC;
+      --ink-faint: #7A6C86;
+      --line: #372D45;
+      --line-strong: #4A3D5C;
+      --fel: #8FD94A;
+      --fel-ink: #10180A;
+      --fel-wash: #24331A;
+      --gold: #C9A05E;
+      --gold-wash: #322616;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -10px rgba(0, 0, 0, .7);
+      --glow: 0 0 18px -4px rgba(143, 217, 74, .45);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #14101A;
+    --surface: #1E1825;
+    --surface-raised: #2A2233;
+    --sunk: #171220;
+    --ink: #E8DFC8;
+    --ink-dim: #A293AC;
+    --ink-faint: #7A6C86;
+    --line: #372D45;
+    --line-strong: #4A3D5C;
+    --fel: #8FD94A;
+    --fel-ink: #10180A;
+    --fel-wash: #24331A;
+    --gold: #C9A05E;
+    --gold-wash: #322616;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px -10px rgba(0, 0, 0, .7);
+    --glow: 0 0 18px -4px rgba(143, 217, 74, .45);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 22px 40px;
+  }
+
+  /* ---------- header ---------- */
+
+  .masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 14px 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 700;
+    margin: 0 0 3px;
+  }
+
+  h1 {
+    font-family: Cinzel, "Trajan Pro", Georgia, serif;
+    font-weight: 700;
+    font-size: clamp(25px, 5.2vw, 38px);
+    letter-spacing: .015em;
+    line-height: 1.05;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .tally {
+    display: flex;
+    gap: 22px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tally div { text-align: right; }
+
+  .tally .n {
+    font-family: Cinzel, Georgia, serif;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+    display: block;
+  }
+
+  .tally .k {
+    font-size: 10.5px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 700;
+  }
+
+  .tally .fel { color: var(--fel); }
+
+  /* ---------- identity bar ---------- */
+
+  .claim {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--gold);
+    border-radius: 3px;
+  }
+
+  .claim.named { border-left-color: var(--fel); }
+
+  .claim label {
+    font-size: 11px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink-faint);
+  }
+
+  input[type="text"] {
+    font: inherit;
+    font-size: 15px;
+    color: var(--ink);
+    background: var(--surface-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    padding: 6px 10px;
+    min-width: 0;
+    flex: 1 1 170px;
+    max-width: 260px;
+  }
+
+  input[type="text"]:focus-visible,
+  button:focus-visible,
+  .cell:focus-visible {
+    outline: 2px solid var(--fel);
+    outline-offset: 2px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: var(--ink);
+    background: var(--surface-raised);
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+    padding: 7px 13px;
+    cursor: pointer;
+  }
+
+  button:hover { border-color: var(--fel); color: var(--fel); }
+
+  button.primary {
+    background: var(--fel);
+    border-color: var(--fel);
+    color: var(--fel-ink);
+  }
+
+  button.primary:hover { filter: brightness(1.08); color: var(--fel-ink); }
+
+  button.quiet {
+    background: none;
+    border-color: transparent;
+    color: var(--ink-faint);
+    font-weight: 500;
+  }
+
+  button.quiet:hover { color: var(--fel); border-color: transparent; }
+
+  .who {
+    font-family: Cinzel, Georgia, serif;
+    font-weight: 700;
+    font-size: 16px;
+  }
+
+  .spacer { flex: 1 1 auto; }
+
+  .status {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    font-style: italic;
+  }
+
+  /* ---------- layout ---------- */
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 286px;
+    gap: 22px;
+    align-items: start;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* ---------- bingo grid ---------- */
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 82px;
+    padding: 9px 7px;
+    font-size: clamp(9.5px, 1.55vw, 12.5px);
+    line-height: 1.24;
+    font-weight: 500;
+    hyphens: auto;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background .14s ease, border-color .14s ease, color .14s ease;
+    font-family: inherit;
+  }
+
+  @media (max-width: 560px) {
+    .cell { min-height: 68px; padding: 6px 4px; font-size: 9.5px; }
+    .grid { gap: 4px; }
+  }
+
+  .cell:hover { border-color: var(--line-strong); background: var(--surface-raised); }
+
+  .cell.pending {
+    background: var(--gold-wash);
+    border-color: var(--gold);
+    border-style: dashed;
+  }
+
+  .cell.mine-pending::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border: 1px solid var(--gold);
+    border-radius: 2px;
+    opacity: .45;
+  }
+
+  .cell.confirmed {
+    background: var(--fel-wash);
+    border-color: var(--fel);
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  .cell.confirmed .txt { text-decoration: line-through; text-decoration-color: var(--fel); }
+
+  .cell.winning {
+    background: var(--fel);
+    color: var(--fel-ink);
+    border-color: var(--fel);
+    box-shadow: var(--glow);
+  }
+
+  .cell.winning .txt { text-decoration-color: var(--fel-ink); }
+
+  .cell.free {
+    background: var(--sunk);
+    border-color: var(--line-strong);
+    cursor: default;
+    font-family: Cinzel, Georgia, serif;
+    font-weight: 700;
+    letter-spacing: .1em;
+    font-size: 11px;
+    color: var(--fel);
+  }
+
+  .cell.free.winning { color: var(--fel-ink); }
+
+  .cell .tick {
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: var(--gold);
+  }
+
+  .cell.confirmed .tick { color: var(--fel); }
+  .cell.winning .tick { color: var(--fel-ink); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 12px;
+    font-size: 11.5px;
+    color: var(--ink-faint);
+  }
+
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+  .swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 2px;
+    border: 1px solid var(--line-strong);
+    flex: none;
+  }
+
+  .swatch.p { background: var(--gold-wash); border-color: var(--gold); border-style: dashed; }
+  .swatch.c { background: var(--fel-wash); border-color: var(--fel); }
+
+  /* ---------- panels ---------- */
+
+  .side { display: flex; flex-direction: column; gap: 16px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .panel h2 {
+    font-family: Cinzel, Georgia, serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    margin: 0;
+    padding: 10px 13px;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-dim);
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .panel h2 .count {
+    font-family: "Alegreya Sans", sans-serif;
+    letter-spacing: 0;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .panel .body { padding: 6px 0; }
+
+  .empty {
+    padding: 12px 13px;
+    font-size: 12.5px;
+    font-style: italic;
+    color: var(--ink-faint);
+  }
+
+  .call {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 9px 13px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .call:last-child { border-bottom: none; }
+
+  .call .txt { flex: 1 1 auto; font-size: 13px; line-height: 1.3; min-width: 0; }
+  .call .by { display: block; font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+  .call button { padding: 4px 10px; font-size: 11.5px; flex: none; }
+
+  .roster-row {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 6px 13px;
+    font-size: 13.5px;
+  }
+
+  .roster-row .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .roster-row.me .nm { font-weight: 700; color: var(--fel); }
+  .roster-row .ct { font-variant-numeric: tabular-nums; color: var(--ink-faint); font-size: 12.5px; }
+
+  .badge {
+    font-family: Cinzel, Georgia, serif;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    background: var(--fel);
+    color: var(--fel-ink);
+    padding: 1px 6px;
+    border-radius: 2px;
+    flex: none;
+  }
+
+  /* ---------- bingo banner ---------- */
+
+  .banner {
+    margin-top: 18px;
+    padding: 15px 18px;
+    background: var(--fel-wash);
+    border: 1px solid var(--fel);
+    border-left: 4px solid var(--fel);
+    border-radius: 3px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+  }
+
+  .banner strong {
+    font-family: Cinzel, Georgia, serif;
+    font-size: 19px;
+    letter-spacing: .1em;
+    color: var(--fel);
+  }
+
+  .banner .sub { font-size: 13.5px; color: var(--ink-dim); }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    margin-top: 32px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    font-size: 12.5px;
+    color: var(--ink-faint);
+  }
+
+  footer p { margin: 0; flex: 1 1 260px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">Burning Crusade Classic &middot; Phase 3</p>
+      <h1>Black Temple Bingo</h1>
+    </div>
+    <div class="tally">
+      <div><span class="n fel" id="tMarks">1</span><span class="k">Your marks</span></div>
+      <div><span class="n" id="tCalled">0</span><span class="k">Called</span></div>
+      <div><span class="n" id="tRaid">0</span><span class="k">In raid</span></div>
+    </div>
+  </header>
+
+  <div class="claim" id="claimBar">
+    <label for="nameInput">Character</label>
+    <input type="text" id="nameInput" placeholder="Illidan" autocomplete="off" spellcheck="false" maxlength="24">
+    <button class="primary" id="claimBtn">Draw my card</button>
+    <span class="status" id="claimHint">Your card is dealt from your character name &mdash; same name, same card, every time.</span>
+  </div>
+
+  <main class="layout">
+    <section>
+      <div class="grid" id="grid"></div>
+      <div class="legend">
+        <span><i class="swatch"></i> Not called</span>
+        <span><i class="swatch p"></i> Called once &mdash; needs a second</span>
+        <span><i class="swatch c"></i> Confirmed</span>
+        <span id="syncNote"></span>
+      </div>
+      <div class="banner" id="banner" hidden>
+        <strong>BINGO</strong>
+        <span class="sub" id="bannerSub"></span>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="panel">
+        <h2>Needs a second <span class="count" id="pendCount">0</span></h2>
+        <div class="body" id="pending"></div>
+      </div>
+      <div class="panel">
+        <h2>Raid <span class="count" id="rosterCount">0</span></h2>
+        <div class="body" id="roster"></div>
+      </div>
+      <div class="panel">
+        <h2>Last called</h2>
+        <div class="body" id="log"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <p>A square counts once <strong>two different people</strong> confirm it. Everyone draws a different card from the same list of 44 calls, so the same event ticks on every card that holds it.</p>
+    <button class="quiet" id="resetBtn">Start a new raid night</button>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------
+     The call list. 44 entries: Black Temple specifics plus the
+     universal truths of a guild raid night.
+  ------------------------------------------------------------------ */
+  var POOL = [
+    "Someone pulls before the count",
+    "Najentus spine not grabbed in time",
+    "“Can I get a summon?”",
+    "Tank dies in the first 30 seconds",
+    "Someone fails the Gorefiend ghosts",
+    "Healer blames the tank",
+    "Wipe under 5% boss health",
+    "Someone AFK at the pull",
+    "Forgot shadow resist for Mother Shahraz",
+    "“Sorry, wrong button”",
+    "Hunter pet pulls a patrol",
+    "Loot drops for a class not here",
+    "Two people roll the same number",
+    "“Did everyone get the summon?”",
+    "Someone DCs mid-fight",
+    "Raid lead explains the fight twice",
+    "“It’s my first time on this one”",
+    "Someone stands in the fire",
+    "Warlock forgets the soulwell",
+    "Mage asked for a table mid-fight",
+    "Reliquary of Souls eats a healer",
+    "Looting before the boss finishes dying",
+    "“Who pulled?”",
+    "Battle rez goes to the wrong person",
+    "Someone’s addon is out of date",
+    "Repair bill mentioned in raid chat",
+    "DKP argument during a boss fight",
+    "Shaman drops the wrong totem",
+    "“I thought you were interrupting”",
+    "Raid waits 10 minutes on one person",
+    "Unprompted Recount link",
+    "“You are not prepared” in chat",
+    "Rogue dies to trash",
+    "Gurtogg fixates the squishiest healer",
+    "Priest gets mind controlled",
+    "“Can we take five?”",
+    "Someone brought the wrong flask",
+    "Off-tank taunts far too early",
+    "Wipe caused by a patrol",
+    "“It’s not me, it’s the server”",
+    "Someone’s first tier piece drops",
+    "Healer OOM before the boss hits 50%",
+    "Warrior charges in early",
+    "Typed in raid instead of whisper"
+  ];
+
+  var SIZE = 25, FREE = 12, DRAW = 24, NEED = 2;
+
+  /* ------------------------------------------------------------------
+     Deterministic card dealing. A name plus the game id seeds a
+     shuffle, so a player's card is reproducible without storing it.
+  ------------------------------------------------------------------ */
+  function hashSeed(str) {
+    var h = 2166136261 >>> 0;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  function mulberry32(a) {
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function dealCard(seedStr, poolLen) {
+    var rnd = mulberry32(hashSeed(seedStr));
+    var idx = [];
+    for (var i = 0; i < poolLen; i++) idx.push(i);
+    for (var j = idx.length - 1; j > 0; j--) {
+      var k = Math.floor(rnd() * (j + 1));
+      var t = idx[j]; idx[j] = idx[k]; idx[k] = t;
+    }
+    var picked = idx.slice(0, DRAW);
+    var card = picked.slice(0, FREE).concat([-1], picked.slice(FREE));
+    return card;
+  }
+
+  var LINES = (function () {
+    var out = [], r, c;
+    for (r = 0; r < 5; r++) out.push([r * 5, r * 5 + 1, r * 5 + 2, r * 5 + 3, r * 5 + 4]);
+    for (c = 0; c < 5; c++) out.push([c, c + 5, c + 10, c + 15, c + 20]);
+    out.push([0, 6, 12, 18, 24]);
+    out.push([4, 8, 12, 16, 20]);
+    return out;
+  })();
+
+  /* ------------------------------------------------------------------
+     Local identity. No viewer-identity capability is available here,
+     so the character name is the identity and it lives in this
+     browser only.
+  ------------------------------------------------------------------ */
+  function lsGet(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* private mode */ } }
+
+  function slugify(name) {
+    var s = String(name).toLowerCase().replace(/[^a-z0-9_\-~:@+]/g, "");
+    s = s.slice(0, 40);
+    if (!s || s === "." || s === "..") s = "raider" + (hashSeed(String(name) + "x") % 100000);
+    return s;
+  }
+
+  /* ------------------------------------------------------------------
+     State
+  ------------------------------------------------------------------ */
+  var db = null;
+  var myName = lsGet("btb.name") || "";
+  var mySlug = myName ? slugify(myName) : "";
+  var config = { gameId: "genesis", pool: POOL };
+  var players = {};          // slug -> {name, gameId, votes:{idx:ts}, bingoAt}
+  var myVotes = {};          // idx -> ts, mirror of my own doc
+  var myBingoAt = null;
+  var card = [];
+  var winningCells = {};
+
+  var el = {
+    grid: document.getElementById("grid"),
+    pending: document.getElementById("pending"),
+    pendCount: document.getElementById("pendCount"),
+    roster: document.getElementById("roster"),
+    rosterCount: document.getElementById("rosterCount"),
+    log: document.getElementById("log"),
+    banner: document.getElementById("banner"),
+    bannerSub: document.getElementById("bannerSub"),
+    claimBar: document.getElementById("claimBar"),
+    nameInput: document.getElementById("nameInput"),
+    claimBtn: document.getElementById("claimBtn"),
+    claimHint: document.getElementById("claimHint"),
+    tMarks: document.getElementById("tMarks"),
+    tCalled: document.getElementById("tCalled"),
+    tRaid: document.getElementById("tRaid"),
+    syncNote: document.getElementById("syncNote"),
+    resetBtn: document.getElementById("resetBtn")
+  };
+
+  /* Tally of confirmations across the raid: idx -> [{slug,name,ts}] */
+  function tallyVotes() {
+    var t = {};
+    Object.keys(players).forEach(function (slug) {
+      var p = players[slug];
+      if (!p || p.gameId !== config.gameId || !p.votes) return;
+      Object.keys(p.votes).forEach(function (k) {
+        var i = parseInt(k, 10);
+        if (isNaN(i)) return;
+        (t[i] = t[i] || []).push({ slug: slug, name: p.name || slug, ts: p.votes[k] || 0 });
+      });
+    });
+    Object.keys(t).forEach(function (i) { t[i].sort(function (a, b) { return a.ts - b.ts; }); });
+    return t;
+  }
+
+  function confirmedAt(list) { return list && list.length >= NEED ? list[NEED - 1].ts : 0; }
+
+  /* ------------------------------------------------------------------
+     Rendering
+  ------------------------------------------------------------------ */
+  function render() {
+    var votes = tallyVotes();
+    var pool = config.pool;
+    card = dealCard((myName || "sample-card") + "|" + config.gameId, pool.length);
+
+    /* which of my cells are marked */
+    var marked = card.map(function (idx, pos) {
+      if (pos === FREE) return true;
+      return confirmedAt(votes[idx]) > 0;
+    });
+
+    /* winning lines */
+    winningCells = {};
+    var bingo = false;
+    LINES.forEach(function (line) {
+      if (line.every(function (p) { return marked[p]; })) {
+        bingo = true;
+        line.forEach(function (p) { winningCells[p] = true; });
+      }
+    });
+
+    renderGrid(votes, marked);
+    renderPending(votes);
+    renderRoster(votes);
+    renderLog(votes);
+
+    var markCount = marked.filter(Boolean).length;
+    var calledCount = Object.keys(votes).filter(function (i) { return confirmedAt(votes[i]) > 0; }).length;
+    el.tMarks.textContent = markCount;
+    el.tCalled.textContent = calledCount;
+    el.tRaid.textContent = Object.keys(players).filter(function (s) {
+      return players[s] && players[s].gameId === config.gameId;
+    }).length;
+
+    /* bingo */
+    if (bingo && myName) {
+      el.banner.hidden = false;
+      var winners = Object.keys(players)
+        .filter(function (s) { return players[s].gameId === config.gameId && players[s].bingoAt; })
+        .sort(function (a, b) { return players[a].bingoAt - players[b].bingoAt; });
+      var place = winners.indexOf(mySlug);
+      el.bannerSub.textContent = place === 0
+        ? "You called it first. Screenshot it before anyone argues."
+        : place > 0
+          ? "You’re number " + (place + 1) + " tonight — " + (players[winners[0]].name || winners[0]) + " got there first."
+          : "Five in a row on your card.";
+      if (!myBingoAt) { myBingoAt = Date.now(); queueWrite(); }
+    } else {
+      el.banner.hidden = true;
+      if (myBingoAt && !bingo) { myBingoAt = null; queueWrite(); }
+    }
+  }
+
+  function renderGrid(votes, marked) {
+    var frag = document.createDocumentFragment();
+    var pool = config.pool;
+
+    card.forEach(function (idx, pos) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cell";
+
+      if (pos === FREE) {
+        btn.className += " free";
+        btn.textContent = "FREE";
+        btn.disabled = true;
+        btn.setAttribute("aria-label", "Free space, always marked");
+      } else {
+        var list = votes[idx] || [];
+        var isConfirmed = confirmedAt(list) > 0;
+        var iVoted = Object.prototype.hasOwnProperty.call(myVotes, idx);
+
+        var txt = document.createElement("span");
+        txt.className = "txt";
+        txt.textContent = pool[idx];
+        btn.appendChild(txt);
+
+        if (isConfirmed) {
+          btn.className += " confirmed";
+        } else if (list.length > 0) {
+          btn.className += " pending";
+          if (iVoted) btn.className += " mine-pending";
+          var tick = document.createElement("span");
+          tick.className = "tick";
+          tick.textContent = list.length + "/" + NEED;
+          btn.appendChild(tick);
+        } else if (iVoted) {
+          btn.className += " pending mine-pending";
+        }
+
+        btn.setAttribute("aria-pressed", iVoted ? "true" : "false");
+        btn.title = isConfirmed
+          ? "Confirmed by " + list.map(function (v) { return v.name; }).join(" and ")
+          : list.length
+            ? "Called by " + list.map(function (v) { return v.name; }).join(", ") + " — needs " + (NEED - list.length) + " more"
+            : "Click to call this";
+        btn.addEventListener("click", function () { toggleVote(idx); });
+      }
+
+      if (winningCells[pos]) btn.className += " winning";
+      frag.appendChild(btn);
+    });
+
+    el.grid.replaceChildren(frag);
+  }
+
+  function renderPending(votes) {
+    var pool = config.pool;
+    var rows = Object.keys(votes)
+      .map(function (k) { return parseInt(k, 10); })
+      .filter(function (i) {
+        var l = votes[i];
+        return l.length > 0 && l.length < NEED && !Object.prototype.hasOwnProperty.call(myVotes, i);
+      })
+      .sort(function (a, b) { return votes[b][0].ts - votes[a][0].ts; });
+
+    el.pendCount.textContent = rows.length;
+
+    if (!rows.length) {
+      el.pending.replaceChildren(msg(myName
+        ? "Nothing waiting. Click any square on your card to call it."
+        : "Enter your character name to join in."));
+      return;
+    }
+
+    var frag = document.createDocumentFragment();
+    rows.forEach(function (i) {
+      var row = document.createElement("div");
+      row.className = "call";
+
+      var t = document.createElement("div");
+      t.className = "txt";
+      t.textContent = pool[i];
+      var by = document.createElement("span");
+      by.className = "by";
+      by.textContent = "called by " + votes[i][0].name;
+      t.appendChild(by);
+      row.appendChild(t);
+
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = "Confirm";
+      b.disabled = !myName;
+      b.addEventListener("click", function () { toggleVote(i); });
+      row.appendChild(b);
+
+      frag.appendChild(row);
+    });
+    el.pending.replaceChildren(frag);
+  }
+
+  function renderRoster(votes) {
+    var slugs = Object.keys(players).filter(function (s) {
+      return players[s] && players[s].gameId === config.gameId;
+    });
+    el.rosterCount.textContent = slugs.length;
+
+    if (!slugs.length) {
+      el.roster.replaceChildren(msg("Nobody has drawn a card yet."));
+      return;
+    }
+
+    var scored = slugs.map(function (s) {
+      var c = dealCard((players[s].name || s) + "|" + config.gameId, config.pool.length);
+      var n = 1; // free space
+      c.forEach(function (idx, pos) {
+        if (pos !== FREE && confirmedAt(votes[idx]) > 0) n++;
+      });
+      return { slug: s, name: players[s].name || s, marks: n, bingoAt: players[s].bingoAt || 0 };
+    });
+
+    scored.sort(function (a, b) {
+      if (!!b.bingoAt !== !!a.bingoAt) return b.bingoAt ? 1 : -1;
+      if (a.bingoAt && b.bingoAt) return a.bingoAt - b.bingoAt;
+      return b.marks - a.marks;
+    });
+
+    var frag = document.createDocumentFragment();
+    scored.forEach(function (p) {
+      var row = document.createElement("div");
+      row.className = "roster-row" + (p.slug === mySlug ? " me" : "");
+
+      var nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = p.name;
+      row.appendChild(nm);
+
+      if (p.bingoAt) {
+        var bd = document.createElement("span");
+        bd.className = "badge";
+        bd.textContent = "BINGO";
+        row.appendChild(bd);
+      }
+
+      var ct = document.createElement("span");
+      ct.className = "ct";
+      ct.textContent = p.marks + "/25";
+      row.appendChild(ct);
+
+      frag.appendChild(row);
+    });
+    el.roster.replaceChildren(frag);
+  }
+
+  function renderLog(votes) {
+    var pool = config.pool;
+    var done = Object.keys(votes)
+      .map(function (k) { return parseInt(k, 10); })
+      .filter(function (i) { return confirmedAt(votes[i]) > 0; })
+      .sort(function (a, b) { return confirmedAt(votes[b]) - confirmedAt(votes[a]); })
+      .slice(0, 8);
+
+    if (!done.length) {
+      el.log.replaceChildren(msg("No calls confirmed yet tonight."));
+      return;
+    }
+
+    var frag = document.createDocumentFragment();
+    done.forEach(function (i) {
+      var row = document.createElement("div");
+      row.className = "call";
+      var t = document.createElement("div");
+      t.className = "txt";
+      t.textContent = pool[i];
+      var by = document.createElement("span");
+      by.className = "by";
+      by.textContent = votes[i].slice(0, NEED).map(function (v) { return v.name; }).join(" + ") + " · " + clock(confirmedAt(votes[i]));
+      t.appendChild(by);
+      row.appendChild(t);
+      frag.appendChild(row);
+    });
+    el.log.replaceChildren(frag);
+  }
+
+  function clock(ts) {
+    try {
+      return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    } catch (e) { return ""; }
+  }
+
+  function msg(text) {
+    var d = document.createElement("div");
+    d.className = "empty";
+    d.textContent = text;
+    return d;
+  }
+
+  /* ------------------------------------------------------------------
+     Voting. Each player writes only their own document, so two people
+     calling the same square at the same moment can never overwrite
+     one another.
+  ------------------------------------------------------------------ */
+  function toggleVote(idx) {
+    if (!myName) {
+      el.nameInput.focus();
+      el.claimHint.textContent = "Enter your character name first — a call has to be attributable.";
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(myVotes, idx)) delete myVotes[idx];
+    else myVotes[idx] = Date.now();
+
+    players[mySlug] = { name: myName, gameId: config.gameId, votes: myVotes, bingoAt: myBingoAt };
+    render();
+    queueWrite();
+  }
+
+  var writing = false, dirty = false;
+
+  function queueWrite() {
+    if (!db || !mySlug) return;
+    if (writing) { dirty = true; return; }
+    writing = true;
+    var body = {
+      name: myName,
+      gameId: config.gameId,
+      votes: myVotes,
+      bingoAt: myBingoAt || 0,
+      seenAt: Date.now()
+    };
+    db.doc("players/" + mySlug).set(body)
+      .catch(function (e) { note("Could not save that call (" + (e && e.code) + ")."); })
+      .then(function () {
+        writing = false;
+        if (dirty) { dirty = false; queueWrite(); }
+      });
+  }
+
+  function note(text) { el.syncNote.textContent = text; }
+
+  /* ------------------------------------------------------------------
+     Identity handling
+  ------------------------------------------------------------------ */
+  function applyName(raw) {
+    var name = String(raw || "").trim().replace(/\s+/g, " ").slice(0, 24);
+    if (!name) return;
+    var oldSlug = mySlug;
+    myName = name;
+    mySlug = slugify(name);
+    lsSet("btb.name", myName);
+
+    el.nameInput.value = myName;
+    el.claimBar.className = "claim named";
+    el.claimBtn.textContent = "Change name";
+    el.claimHint.textContent = "Click a square when it happens. Two different people have to call it before it sticks.";
+
+    if (oldSlug !== mySlug) {
+      var existing = players[mySlug];
+      myVotes = (existing && existing.gameId === config.gameId && existing.votes) ? Object.assign({}, existing.votes) : {};
+      myBingoAt = (existing && existing.gameId === config.gameId && existing.bingoAt) ? existing.bingoAt : null;
+    }
+    players[mySlug] = { name: myName, gameId: config.gameId, votes: myVotes, bingoAt: myBingoAt };
+    render();
+    queueWrite();
+  }
+
+  el.claimBtn.addEventListener("click", function () {
+    if (myName && el.nameInput.value.trim() === myName) { el.nameInput.select(); return; }
+    applyName(el.nameInput.value);
+  });
+
+  el.nameInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); applyName(el.nameInput.value); }
+  });
+
+  el.resetBtn.addEventListener("click", function () {
+    if (!db) { note("A new night needs the shared board."); return; }
+    if (!window.confirm("Start a new raid night? Every card is reshuffled and all calls are cleared for everyone.")) return;
+    var next = { gameId: "n" + Date.now().toString(36), pool: config.pool, startedAt: Date.now() };
+    db.doc("game/config").set(next).catch(function (e) {
+      note("Could not start a new night (" + (e && e.code) + ").");
+    });
+  });
+
+  /* ------------------------------------------------------------------
+     Boot
+  ------------------------------------------------------------------ */
+  function start() {
+    if (myName) {
+      el.nameInput.value = myName;
+      el.claimBar.className = "claim named";
+      el.claimBtn.textContent = "Change name";
+      el.claimHint.textContent = "Click a square when it happens. Two different people have to call it before it sticks.";
+    }
+    render();
+
+    var use = window.claude && window.claude.use;
+    if (!use) { note("Offline — this card is yours alone."); return; }
+
+    note("Connecting…");
+    window.claude.use("db").then(function (store) {
+      if (!store) { note("Offline — this card is yours alone."); return; }
+      db = store;
+      note("");
+
+      db.doc("game/config").onSnapshot(function (snap) {
+        if (snap.exists) {
+          var d = snap.data() || {};
+          var prevGame = config.gameId;
+          config = {
+            gameId: d.gameId || "genesis",
+            pool: Array.isArray(d.pool) && d.pool.length >= DRAW ? d.pool : POOL
+          };
+          if (config.gameId !== prevGame) {
+            myVotes = {};
+            myBingoAt = null;
+            if (mySlug) { players[mySlug] = { name: myName, gameId: config.gameId, votes: myVotes, bingoAt: null }; queueWrite(); }
+          }
+        }
+        render();
+      }, function (e) { note("Board connection lost (" + e.code + "). Reload to rejoin."); });
+
+      db.collection("players").onSnapshot(function (snap) {
+        var next = {};
+        snap.docs.forEach(function (d) {
+          var v = d.data() || {};
+          next[d.id] = {
+            name: v.name || d.id,
+            gameId: v.gameId || "genesis",
+            votes: v.votes && typeof v.votes === "object" ? v.votes : {},
+            bingoAt: v.bingoAt || 0
+          };
+        });
+        players = next;
+        if (mySlug && players[mySlug] && players[mySlug].gameId === config.gameId) {
+          if (!writing && !dirty) {
+            myVotes = Object.assign({}, players[mySlug].votes);
+            myBingoAt = players[mySlug].bingoAt || null;
+          }
+        }
+        if (mySlug) {
+          players[mySlug] = { name: myName, gameId: config.gameId, votes: myVotes, bingoAt: myBingoAt };
+        }
+        render();
+      }, function (e) { note("Raid list disconnected (" + e.code + ")."); });
+
+      if (mySlug) queueWrite();
+    });
+  }
+
+  if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(start);
+  else start();
+})();
+</script>

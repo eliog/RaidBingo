@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya+Sans:wght@400;500;700&display=swap">
+  <style>
+    body{margin:0;background:#14101A;color:#E8DFC8;font-family:"Alegreya Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+    a{color:#8FD94A}a:hover{color:#A8E56B}
+    .cz{font-family:Cinzel,Georgia,serif;font-weight:700}
+    .eyebrow{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#A293AC}
+    .mono{font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px;color:#A293AC}
+    .panel{background:#1E1825;border:1px solid #372D45;border-radius:3px}
+    .field{background:#171220;border:1px solid #4A3D5C;border-radius:3px;padding:10px 12px;font-size:15px;color:#E8DFC8}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;font-weight:700;font-size:13px;letter-spacing:.04em;background:#2A2233;border:1px solid #4A3D5C;border-radius:3px;padding:10px 16px;color:#E8DFC8}
+    .btn.pri{background:#8FD94A;border-color:#8FD94A;color:#10180A}
+    .slot{display:flex;align-items:center;gap:11px}
+    .num{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:12px;width:20px;text-align:right;color:#7A6C86;flex:none}
+    .num.on{color:#8FD94A}
+  </style>
+</helmet>
+<div style="width:1440px;min-height:900px;background:#14101A;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:0 56px;height:56px;border-bottom:1px solid #372D45;background:#1E1825">
+    <div style="display:flex;align-items:center;gap:12px">
+      <svg viewBox="0 0 64 64" width="26" height="26" fill="none" style="color:#E8DFC8">
+        <path d="M11 2H53L62 11V53L53 62H11L2 53V11Z" stroke="#C9A05E" stroke-width="2.2"/>
+        <g fill="currentColor" opacity=".2"><path d="M14.5 11H23V19.5L19.5 23H11V14.5Z"/><path d="M29.5 11H38V19.5L34.5 23H26V14.5Z"/><path d="M14.5 26H23V34.5L19.5 38H11V29.5Z"/><path d="M44.5 26H53V34.5L49.5 38H41V29.5Z"/><path d="M29.5 41H38V49.5L34.5 53H26V44.5Z"/><path d="M44.5 41H53V49.5L49.5 53H41V44.5Z"/></g>
+        <g fill="#8FD94A"><path d="M44.5 11H53V19.5L49.5 23H41V14.5Z"/><path d="M29.5 26H38V34.5L34.5 38H26V29.5Z"/><path d="M14.5 41H23V49.5L19.5 53H11V44.5Z"/></g>
+      </svg>
+      <span class="cz" style="font-size:15px;letter-spacing:.09em;text-transform:uppercase">Raid Bingo</span>
+    </div>
+    <span class="cz" style="font-size:15px">Felwarden &#9662;</span>
+  </div>
+
+  <div style="width:820px;margin:0 auto;padding:40px 0 56px;display:flex;flex-direction:column;gap:34px">
+
+    <div>
+      <p class="eyebrow" style="margin:0 0 14px">Playing now</p>
+      <div style="display:flex;gap:20px">
+      <div class="panel" style="width:312px;padding:18px 20px;box-sizing:border-box;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <span class="cz" style="font-size:17px;line-height:1.2">Tuesday BT run</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#8FD94A"><span style="width:6px;height:6px;border-radius:50%;background:#8FD94A"></span>LIVE</span>
+        </div>
+        <span class="mono" style="font-size:12px;word-break:break-all">shattered-felguard-netherstorm</span>
+        <div style="display:flex;align-items:center;gap:9px"><span style="display:flex;gap:3px"><span style="width:15px;height:5px;border-radius:1px;background:#8FD94A"></span><span style="width:15px;height:5px;border-radius:1px;background:#8FD94A"></span><span style="width:15px;height:5px;border-radius:1px;background:#8FD94A"></span><span style="width:15px;height:5px;border-radius:1px;background:#372D45"></span><span style="width:15px;height:5px;border-radius:1px;background:#372D45"></span></span><span style="font-size:12.5px;color:#A293AC;font-variant-numeric:tabular-nums">14 of 24</span></div>
+        <div style="display:flex;align-items:center;gap:11px;font-size:12.5px;color:#7A6C86"><span>as Felwarden</span><span style="font-size:11.5px;color:#C9A05E">&#8962; you own</span></div>
+        <div class="btn pri" style="margin-top:4px;width:100%;height:40px;box-sizing:border-box">Resume</div>
+      </div>
+      <div class="panel" style="width:312px;padding:18px 20px;box-sizing:border-box;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+          <span class="cz" style="font-size:17px;line-height:1.2">Sunday Hyjal pugs</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#8FD94A"><span style="width:6px;height:6px;border-radius:50%;background:#8FD94A"></span>LIVE</span>
+        </div>
+        <span class="mono" style="font-size:12px;word-break:break-all">crimson-void-stormrage</span>
+        <div style="display:flex;align-items:center;gap:9px"><span style="display:flex;gap:3px"><span style="width:15px;height:5px;border-radius:1px;background:#8FD94A"></span><span style="width:15px;height:5px;border-radius:1px;background:#372D45"></span><span style="width:15px;height:5px;border-radius:1px;background:#372D45"></span><span style="width:15px;height:5px;border-radius:1px;background:#372D45"></span><span style="width:15px;height:5px;border-radius:1px;background:#372D45"></span></span><span style="font-size:12.5px;color:#A293AC;font-variant-numeric:tabular-nums">3 of 24</span></div>
+        <div style="display:flex;align-items:center;gap:11px;font-size:12.5px;color:#7A6C86"><span>as Bonkgrog</span></div>
+        <div class="btn pri" style="margin-top:4px;width:100%;height:40px;box-sizing:border-box">Resume</div>
+      </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:20px;align-items:stretch">
+      <div class="panel" style="flex:1;padding:20px;box-sizing:border-box">
+        <p class="eyebrow" style="margin:0 0 11px">Join with a game ID</p>
+        <div style="display:flex;gap:10px">
+          <div class="field" style="flex:1;color:#7A6C86">paste it here</div>
+          <div class="btn" style="padding:10px 20px">Join</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:11px">
+          <span style="width:26px;height:6px;border:1px solid #4A3D5C;border-radius:1px"></span>
+          <span style="width:26px;height:6px;border:1px solid #4A3D5C;border-radius:1px"></span>
+          <span style="width:26px;height:6px;border:1px solid #4A3D5C;border-radius:1px"></span>
+          <span style="font-size:12.5px;color:#7A6C86;margin-left:4px">Three words, dashes between.</span>
+        </div>
+      </div>
+      <div class="panel" style="width:250px;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between">
+        <p style="margin:0;font-size:13px;line-height:1.45;color:#A293AC">Pick 24 squares and call them yourself.</p>
+        <div class="btn pri" style="margin-top:14px;width:100%;height:42px;box-sizing:border-box">+ New game</div>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+        <p class="eyebrow" style="margin:0">Past games</p>
+        <span style="font-size:12.5px;color:#7A6C86">Last 30 days</span>
+      </div>
+      <div class="panel">
+        <div style="display:flex;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #2A2233">
+          <span style="width:74px;font-size:12.5px;color:#7A6C86;flex:none">Wed 3 Sep</span>
+          <span class="cz" style="flex:1;font-size:15px">Guild fun night</span>
+          <span style="font-size:13px;color:#A293AC">as Felwarden</span>
+          <span class="cz" style="font-size:9.5px;letter-spacing:.1em;background:#8FD94A;color:#10180A;padding:2px 7px;border-radius:2px">BINGO #2</span>
+          <span style="color:#7A6C86">&#8250;</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #2A2233">
+          <span style="width:74px;font-size:12.5px;color:#7A6C86;flex:none">Tue 2 Sep</span>
+          <span class="cz" style="flex:1;font-size:15px">Tuesday BT run <span style="font-size:11.5px;color:#C9A05E;font-family:'Alegreya Sans',sans-serif;font-weight:400">&#8962;</span></span>
+          <span style="font-size:13px;color:#A293AC">as Felwarden</span>
+          <span style="font-size:12.5px;color:#7A6C86">no bingo</span>
+          <span style="color:#7A6C86">&#8250;</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:14px 18px">
+          <span style="width:74px;font-size:12.5px;color:#7A6C86;flex:none">Tue 26 Aug</span>
+          <span class="cz" style="flex:1;font-size:15px">Sunday Hyjal pugs</span>
+          <span style="font-size:13px;color:#A293AC">as Bonkgrog</span>
+          <span class="cz" style="font-size:9.5px;letter-spacing:.1em;background:#8FD94A;color:#10180A;padding:2px 7px;border-radius:2px">BINGO #1</span>
+          <span style="color:#7A6C86">&#8250;</span>
+        </div>
+      </div>
+      <p style="margin:14px 0 0;font-size:12.5px;color:#7A6C86;font-style:italic">Only games you're in show up here. There's no public list.</p>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

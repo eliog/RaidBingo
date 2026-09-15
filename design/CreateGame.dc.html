@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya+Sans:wght@400;500;700&display=swap">
+  <style>
+    body{margin:0;background:#14101A;color:#E8DFC8;font-family:"Alegreya Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+    a{color:#8FD94A}a:hover{color:#A8E56B}
+    .cz{font-family:Cinzel,Georgia,serif;font-weight:700}
+    .eyebrow{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#A293AC}
+    .mono{font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px;color:#A293AC}
+    .panel{background:#1E1825;border:1px solid #372D45;border-radius:3px}
+    .field{background:#171220;border:1px solid #4A3D5C;border-radius:3px;padding:10px 12px;font-size:15px;color:#E8DFC8}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;font-weight:700;font-size:13px;letter-spacing:.04em;background:#2A2233;border:1px solid #4A3D5C;border-radius:3px;padding:10px 16px;color:#E8DFC8}
+    .btn.pri{background:#8FD94A;border-color:#8FD94A;color:#10180A}
+    .slot{display:flex;align-items:center;gap:11px}
+    .num{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:12px;width:20px;text-align:right;color:#7A6C86;flex:none}
+    .num.on{color:#8FD94A}
+  </style>
+</helmet>
+<div style="width:1440px;min-height:900px;background:#14101A;display:flex;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:0 56px;height:56px;border-bottom:1px solid #372D45;background:#1E1825">
+    <div style="display:flex;align-items:center;gap:12px">
+      <svg viewBox="0 0 64 64" width="26" height="26" fill="none" style="color:#E8DFC8">
+        <path d="M11 2H53L62 11V53L53 62H11L2 53V11Z" stroke="#C9A05E" stroke-width="2.2"/>
+        <g fill="currentColor" opacity=".2"><path d="M14.5 11H23V19.5L19.5 23H11V14.5Z"/><path d="M29.5 11H38V19.5L34.5 23H26V14.5Z"/><path d="M14.5 26H23V34.5L19.5 38H11V29.5Z"/><path d="M44.5 26H53V34.5L49.5 38H41V29.5Z"/><path d="M29.5 41H38V49.5L34.5 53H26V44.5Z"/><path d="M44.5 41H53V49.5L49.5 53H41V44.5Z"/></g>
+        <g fill="#8FD94A"><path d="M44.5 11H53V19.5L49.5 23H41V14.5Z"/><path d="M29.5 26H38V34.5L34.5 38H26V29.5Z"/><path d="M14.5 41H23V49.5L19.5 53H11V44.5Z"/></g>
+      </svg>
+      <span class="cz" style="font-size:15px;letter-spacing:.09em;text-transform:uppercase">Raid Bingo</span>
+    </div>
+    <span class="cz" style="font-size:15px">Felwarden &#9662;</span>
+  </div>
+
+  <div style="width:940px;margin:0 auto;padding:32px 0 48px">
+    <p style="margin:0 0 6px;font-size:13px;color:#7A6C86">&#8249; Lobby</p>
+    <h1 class="cz" style="margin:0 0 26px;font-size:30px;letter-spacing:.06em;text-transform:uppercase">New game</h1>
+
+    <p class="eyebrow" style="margin:0 0 9px">Title</p>
+    <div class="field" style="width:420px;box-sizing:border-box">Tuesday BT run</div>
+    <p style="margin:8px 0 0;font-size:12.5px;color:#7A6C86">Seen in the lobby and in Discord. 40 characters.</p>
+
+    <div style="display:flex;align-items:center;gap:12px;margin:30px 0 14px">
+      <span class="eyebrow" style="margin:0">Start from</span>
+      <span style="flex:1;height:1px;background:linear-gradient(90deg,#C9A05E,transparent);opacity:.4"></span>
+    </div>
+    <div style="display:flex;gap:14px;align-items:stretch">
+        <div class="panel" style="width:186px;padding:14px 15px;box-sizing:border-box;display:flex;flex-direction:column;gap:6px">
+          <span class="cz" style="font-size:14px;line-height:1.2">Tuesday BT run</span>
+          <span style="font-size:11.5px;color:#7A6C86">2 Sep &middot; 24</span>
+          <span style="font-size:12px;color:#A293AC;line-height:1.35;flex:1">“Tank pulls early”, “MD to the tank”…</span>
+          <span style="font-size:11.5px;color:#8FD94A">See all 24</span>
+          <div class="btn" style="width:100%;padding:7px 0;font-size:12px">Use it</div>
+        </div>
+        <div class="panel" style="width:186px;padding:14px 15px;box-sizing:border-box;display:flex;flex-direction:column;gap:6px">
+          <span class="cz" style="font-size:14px;line-height:1.2">Sunday Hyjal pugs</span>
+          <span style="font-size:11.5px;color:#7A6C86">26 Aug &middot; 24</span>
+          <span style="font-size:12px;color:#A293AC;line-height:1.35;flex:1">“Hunter MDs to healer”…</span>
+          <span style="font-size:11.5px;color:#8FD94A">See all 24</span>
+          <div class="btn" style="width:100%;padding:7px 0;font-size:12px">Use it</div>
+        </div>
+        <div class="panel" style="width:186px;padding:14px 15px;box-sizing:border-box;display:flex;flex-direction:column;gap:6px">
+          <span class="cz" style="font-size:14px;line-height:1.2">Guild fun night</span>
+          <span style="font-size:11.5px;color:#7A6C86">19 Aug &middot; 24</span>
+          <span style="font-size:12px;color:#A293AC;line-height:1.35;flex:1">“‘One more pull’”…</span>
+          <span style="font-size:11.5px;color:#8FD94A">See all 24</span>
+          <div class="btn" style="width:100%;padding:7px 0;font-size:12px">Use it</div>
+        </div>
+        <div class="panel" style="width:130px;padding:14px 15px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;border-style:dashed">
+          <span class="cz" style="font-size:14px">Blank</span>
+          <span style="font-size:12px;color:#7A6C86;line-height:1.35">Start from scratch</span>
+          <div class="btn" style="width:100%;padding:7px 0;font-size:12px">Use</div>
+        </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:12px;margin:32px 0 6px">
+      <span class="eyebrow" style="margin:0">Squares</span>
+      <span style="flex:1;height:1px;background:linear-gradient(90deg,#C9A05E,transparent);opacity:.4"></span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <span style="font-size:14px;color:#8FD94A;font-weight:700">15 of 24 filled</span>
+        <p style="margin:3px 0 0;font-size:12.5px;color:#7A6C86">Order doesn't matter &mdash; every player's board is shuffled.</p>
+      </div>
+      <div style="display:flex;border:1px solid #4A3D5C;border-radius:3px;overflow:hidden">
+        <span style="padding:8px 15px;font-size:12.5px;font-weight:700;background:#2A2233">Type one by one</span>
+        <span style="padding:8px 15px;font-size:12.5px;color:#A293AC">Paste a list</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 26px">
+        <div><div class="slot"><span class="num on">1</span><div class="field" style="flex:1;box-sizing:border-box">Tank pulls before buffs</div></div></div>
+        <div><div class="slot"><span class="num on">2</span><div class="field" style="flex:1;box-sizing:border-box">MD to the healer</div></div></div>
+        <div><div class="slot"><span class="num on">3</span><div class="field" style="flex:1;box-sizing:border-box">Someone AFK on ready check</div></div></div>
+        <div><div class="slot"><span class="num on">4</span><div class="field" style="flex:1;box-sizing:border-box;border-color:#C9A05E">Someone AFK on ready check</div></div><p style="margin:4px 0 0 31px;font-size:11.5px;color:#C9A05E">&#9888; Same as 3 &mdash; change one of them.</p></div>
+        <div><div class="slot"><span class="num on">5</span><div class="field" style="flex:1;box-sizing:border-box">Ret pally stands in the fire for the whole pull</div></div><p style="margin:4px 0 0 31px;font-size:11.5px;color:#C9A05E">&#9432; 52 characters &mdash; tight at phone width.</p></div>
+        <div><div class="slot"><span class="num on">6</span><div class="field" style="flex:1;box-sizing:border-box">Wipe under 5%</div></div></div>
+        <div><div class="slot"><span class="num on">7</span><div class="field" style="flex:1;box-sizing:border-box">Hunter pet aggro</div></div></div>
+        <div><div class="slot"><span class="num on">8</span><div class="field" style="flex:1;box-sizing:border-box">"Can we get a summon?"</div></div></div>
+        <div><div class="slot"><span class="num on">9</span><div class="field" style="flex:1;box-sizing:border-box">Healer blames the tank</div></div></div>
+        <div><div class="slot"><span class="num on">10</span><div class="field" style="flex:1;box-sizing:border-box">Two people roll the same number</div></div></div>
+        <div><div class="slot"><span class="num on">11</span><div class="field" style="flex:1;box-sizing:border-box">Someone DCs mid-fight</div></div></div>
+        <div><div class="slot"><span class="num on">12</span><div class="field" style="flex:1;box-sizing:border-box">Repair bill in raid chat</div></div></div>
+        <div><div class="slot"><span class="num on">13</span><div class="field" style="flex:1;box-sizing:border-box">Warlock forgets the soulwell</div></div></div>
+        <div><div class="slot"><span class="num on">14</span><div class="field" style="flex:1;box-sizing:border-box">Rogue dies to trash</div></div></div>
+        <div><div class="slot"><span class="num on">15</span><div class="field" style="flex:1;box-sizing:border-box">Unprompted Recount link</div></div></div>
+        <div><div class="slot"><span class="num">16</span><div class="field" style="flex:1;box-sizing:border-box"><span style="color:#4A3D5C"></span></div></div></div>
+        <div><div class="slot"><span class="num">17</span><div class="field" style="flex:1;box-sizing:border-box"><span style="color:#4A3D5C"></span></div></div></div>
+        <div><div class="slot"><span class="num">18</span><div class="field" style="flex:1;box-sizing:border-box"><span style="color:#4A3D5C"></span></div></div></div>
+        <div><div class="slot"><span class="num">19</span><div class="field" style="flex:1;box-sizing:border-box"><span style="color:#4A3D5C"></span></div></div></div>
+        <div><div class="slot"><span class="num">20</span><div class="field" style="flex:1;box-sizing:border-box"><span style="color:#4A3D5C"></span></div></div></div>
+        <div><div class="slot"><span class="num">21</span><div class="field" style="flex:1;box-sizing:border-box"><span style="color:#4A3D5C"></span></div></div></div>
+        <div><div class="slot"><span class="num">22</span><div class="field" style="flex:1;box-sizing:border-box"><span style="color:#4A3D5C"></span></div></div></div>
+        <div><div class="slot"><span class="num">23</span><div class="field" style="flex:1;box-sizing:border-box"><span style="color:#4A3D5C"></span></div></div></div>
+        <div><div class="slot"><span class="num">24</span><div class="field" style="flex:1;box-sizing:border-box"><span style="color:#4A3D5C"></span></div></div></div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:28px;padding-top:18px;border-top:1px solid #372D45">
+      <p style="margin:0;font-size:12.5px;color:#7A6C86;max-width:420px;line-height:1.45">Title stays editable. Squares lock for good the moment the first player joins.</p>
+      <div style="display:flex;gap:11px">
+        <div class="btn">Cancel</div>
+        <div class="btn pri" style="padding:10px 22px">Create game</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,115 @@
+{
+  "artboards": [
+    {
+      "file": "Login.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-1",
+      "title": "Login"
+    },
+    {
+      "file": "Lobby.dc.html",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-1",
+      "title": "Lobby"
+    },
+    {
+      "file": "CreateGame.dc.html",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 1400,
+      "page": "page-1",
+      "title": "Create game"
+    },
+    {
+      "file": "JoinGame.dc.html",
+      "x": 4680,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "page": "page-1",
+      "title": "Join game"
+    },
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 1620,
+      "w": 1440,
+      "h": 1010,
+      "page": "page-1",
+      "title": "Board \u2014 owner (desktop)"
+    },
+    {
+      "file": "BoardPlayer.dc.html",
+      "x": 1560,
+      "y": 1620,
+      "w": 1440,
+      "h": 1010,
+      "page": "page-1",
+      "title": "Board \u2014 player (desktop)"
+    },
+    {
+      "file": "BoardPhone.dc.html",
+      "x": 3120,
+      "y": 1620,
+      "w": 390,
+      "h": 844,
+      "page": "page-1",
+      "title": "Board \u2014 owner (phone)"
+    },
+    {
+      "file": "Identity.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1200,
+      "h": 1100,
+      "page": "page-2",
+      "title": "Visual identity"
+    },
+    {
+      "file": "States.dc.html",
+      "x": 1320,
+      "y": 0,
+      "w": 1200,
+      "h": 1260,
+      "page": "page-2",
+      "title": "States"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "flow",
+      "x": 0,
+      "y": -150,
+      "w": 560,
+      "text": "Entry flow, left to right. A player normally arrives from a pasted Discord link and lands on Join game, never the lobby."
+    },
+    {
+      "id": "board-note",
+      "x": 0,
+      "y": 1470,
+      "w": 560,
+      "text": "The board column is byte-identical in owner and player mode \u2014 same width, same cell metrics, same fitted font. Only the chrome around it differs."
+    }
+  ],
+  "pages": [
+    {
+      "id": "page-1",
+      "name": "Screens"
+    },
+    {
+      "id": "page-2",
+      "name": "Identity & states"
+    }
+  ],
+  "launch": {
+    "view": "canvas",
+    "page": "page-1"
+  }
+}

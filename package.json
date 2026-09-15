@@ -1,0 +1,26 @@
+{
+  "name": "raid-bingo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bingo for raid night.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/",
+    "dev": "node --watch server/main.ts",
+    "start": "node server/main.ts",
+    "hooks": "git config core.hooksPath .githooks"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.5.13"
+  }
+}
