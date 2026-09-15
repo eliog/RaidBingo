@@ -16,6 +16,9 @@ numbers, no content tables. The app never talks to the game client.
 - Every player gets the **same 24 items in a different order**.
 - **The owner calls squares.** A call ticks on every board at once. The owner can undo any
   call — one click on the same square, not buried in a menu.
+- **An undo leaves no trace.** Any bingo that rested on the undone call is taken back with
+  it, and disappears from the standings as if it never happened. A player who still holds
+  a line some other way keeps theirs, with their original time. Re-calling restores it.
 - No player voting, no pending state: a square is called or it is not.
 - Win is five in a row: row, column or diagonal.
 - The night continues past the first bingo; winners are ranked by time.
@@ -168,6 +171,7 @@ Vitest dependency.
 | HTTP routes, OAuth callback | `fastify.inject()` |
 | WebSocket | Real client on an ephemeral port |
 | A call and an undo reaching every board | Playwright driving two browser contexts |
+| Bingo revoked and restored around an undo | Pure functions + service tests |
 
 ### Four seams required from the first commit
 

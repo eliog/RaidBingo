@@ -149,6 +149,8 @@ export function createRepository(db: DatabaseSync): Repository {
       `SELECT 1 FROM game_players WHERE game_id = ? AND char_name_key = ? LIMIT 1`),
     markBingo: db.prepare(
       `UPDATE game_players SET bingo_at = ? WHERE game_id = ? AND pid = ? AND bingo_at IS NULL`),
+    clearBingo: db.prepare(
+      `UPDATE game_players SET bingo_at = NULL WHERE game_id = ? AND pid = ?`),
 
     addCall: db.prepare(
       `INSERT INTO calls (game_id, item_idx, called_at) VALUES (?, ?, ?)
@@ -235,6 +237,9 @@ export function createRepository(db: DatabaseSync): Repository {
     },
     async markBingo(gameId, pid, at) {
       q.markBingo.run(at, gameId, pid);
+    },
+    async clearBingo(gameId, pid) {
+      q.clearBingo.run(gameId, pid);
     },
 
     async addCall(gameId, itemIndex, at) {

@@ -347,7 +347,6 @@ function renderBoard() {
   const banner = h("div", { class: "banner", hidden: true });
   const rosterBody = h("div", { class: "body" });
   const logBody = h("div", { class: "body" });
-  const listBody = h("div", { class: "body" });
   const filter = h("input", { type: "text", placeholder: "filter items…" });
 
   /* one fitted size for the whole grid — 25 different sizes reads as a ransom note */
@@ -443,24 +442,10 @@ function renderBoard() {
           onclick: () => send("undo", item) }, "↩") : null));
     }
 
-    if (owner) drawCallList();
     fit();
   }
 
   const ordinal = (n) => ["", "1st", "2nd", "3rd"][n] ?? `${n}th`;
-
-  function drawCallList() {
-    const q = filter.value.trim().toLowerCase();
-    const calledSet = new Set(called.keys());
-    clear(listBody);
-    const todo = game.items.map((t, i) => [t, i]).filter(([t, i]) => !calledSet.has(i) && t.toLowerCase().includes(q));
-    if (!todo.length) listBody.append(h("p", { class: "empty" }, q ? "Nothing matches." : "Every square has been called."));
-    for (const [text, i] of todo) {
-      listBody.append(h("button", { class: "lrow", style: "width:100%;text-align:left;background:none;border-width:0 0 1px 0;color:inherit;font:inherit;cursor:pointer",
-        onclick: () => openSheet(i, false) }, h("span", { class: "nm", style: "white-space:normal", text })));
-    }
-  }
-  filter.addEventListener("input", drawCallList);
 
   /* ---- the sheet: how you read a square, and how the owner calls one ---- */
   function openSheet(item, isOn) {
@@ -560,10 +545,9 @@ function renderBoard() {
     socket.addEventListener("error", () => socket.close());
   }
 
+  // No "call a square" list: every item is on the owner's own board, so the
+  // list only ever duplicated it — and it pushed standings below the fold.
   const rail = h("aside", { class: "stack" },
-    owner ? h("div", { class: "panel" },
-      h("div", { class: "ph" }, h("span", null, "Call a square")),
-      h("div", { style: "padding:10px 14px 4px" }, filter), listBody) : null,
     h("div", { class: "panel" }, h("h2", null, h("span", null, "Standings"),
       h("span", { class: "dim tabular", text: String(game.roster.length) })), rosterBody),
     h("div", { class: "panel" }, h("h2", null, h("span", null, "Call log")), logBody));

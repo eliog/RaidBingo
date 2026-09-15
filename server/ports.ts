@@ -82,6 +82,8 @@ export interface Repository {
   /** Case-insensitive, whitespace-collapsed. `char_name` is the only visible identity. */
   isNameTaken(gameId: string, charName: string): Promise<boolean>;
   markBingo(gameId: string, pid: string, at: number): Promise<void>;
+  /** Undoing the call a line depended on takes the bingo back with it. */
+  clearBingo(gameId: string, pid: string): Promise<void>;
 
   /** Idempotent: calling an already-called square is a no-op, not an error. */
   addCall(gameId: string, itemIndex: number, at: number): Promise<void>;

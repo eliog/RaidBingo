@@ -147,17 +147,49 @@ test("completing a line stamps a bingo and names the winner", async () => {
   assert.equal(view.value.roster[0]?.bingoAt, T0);
 });
 
-test("an undo does not un-happen a bingo that was already announced", async () => {
+test("undoing the call a line rested on takes the bingo back with it", async () => {
   const h = await withGame();
   const joined = await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
   assert.ok(joined.ok);
   const board = joined.value.board as number[];
   for (const p of [0, 1, 2, 3, 4]) await h.service.call(OWNER, h.gameId, board[p] as number);
 
+  let view = await h.service.view(ALICE, h.gameId);
+  assert.ok(view.ok && view.value.roster[0]?.bingoAt !== null);
+
   await h.service.undo(OWNER, h.gameId, board[0] as number);
+  view = await h.service.view(ALICE, h.gameId);
+  assert.ok(view.ok);
+  assert.equal(view.value.roster[0]?.bingoAt, null, "the bingo should be gone entirely");
+});
+
+test("a bingo survives an undo if another line still holds", async () => {
+  const h = await withGame();
+  const joined = await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
+  assert.ok(joined.ok);
+  const board = joined.value.board as number[];
+  // Top row and left column share the corner at position 0.
+  for (const p of [0, 1, 2, 3, 4, 5, 10, 15, 20]) {
+    await h.service.call(OWNER, h.gameId, board[p] as number);
+  }
+  // Break the top row at position 4; the left column is untouched.
+  await h.service.undo(OWNER, h.gameId, board[4] as number);
+
   const view = await h.service.view(ALICE, h.gameId);
   assert.ok(view.ok);
-  assert.notEqual(view.value.roster[0]?.bingoAt, null);
+  assert.notEqual(view.value.roster[0]?.bingoAt, null, "the column still wins");
+});
+
+test("re-calling after an undo restores the bingo", async () => {
+  const h = await withGame();
+  const joined = await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
+  assert.ok(joined.ok);
+  const board = joined.value.board as number[];
+  for (const p of [0, 1, 2, 3, 4]) await h.service.call(OWNER, h.gameId, board[p] as number);
+  await h.service.undo(OWNER, h.gameId, board[0] as number);
+  const again = await h.service.call(OWNER, h.gameId, board[0] as number);
+  assert.ok(again.ok);
+  assert.deepEqual(again.value.winners, ["Thalgrim"]);
 });
 
 test("a late joiner inherits every call already made", async () => {

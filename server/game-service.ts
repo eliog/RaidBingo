@@ -216,20 +216,30 @@ export class GameService {
 
     // A late joiner inherits every call already made, which can be an
     // instant bingo.
-    await this.#stampBingos(gameId);
+    await this.#reconcileBingos(gameId);
     return await this.view(pid, gameId);
   }
 
-  /** Returns the character names that newly completed a line. */
-  async #stampBingos(gameId: string): Promise<string[]> {
+  /**
+   * Bring every player's bingo into line with the calls that actually stand.
+   *
+   * Run after a call AND after an undo: an undo has to leave no trace, so a
+   * bingo that depended on the undone call is taken back with it. A player who
+   * still holds a line some other way keeps theirs, and their original time.
+   *
+   * Returns the character names that newly completed a line.
+   */
+  async #reconcileBingos(gameId: string): Promise<string[]> {
     const called = new Set((await this.#repo.callsFor(gameId)).keys());
     const now = this.#clock.now();
     const fresh: string[] = [];
     for (const row of await this.#repo.rosterFor(gameId)) {
-      if (row.bingoAt !== null) continue;
-      if (hasBingo(row.board, called)) {
+      const won = hasBingo(row.board, called);
+      if (won && row.bingoAt === null) {
         await this.#repo.markBingo(gameId, row.pid, now);
         fresh.push(row.charName);
+      } else if (!won && row.bingoAt !== null) {
+        await this.#repo.clearBingo(gameId, row.pid);
       }
     }
     return fresh;
@@ -245,7 +255,7 @@ export class GameService {
     }
     // Idempotent by primary key, so the reflex double-tap is safe.
     await this.#repo.addCall(gameId, itemIndex, this.#clock.now());
-    return ok({ winners: await this.#stampBingos(gameId) });
+    return ok({ winners: await this.#reconcileBingos(gameId) });
   }
 
   async undo(pid: string, gameId: string, itemIndex: number): Promise<Result<null>> {
@@ -254,8 +264,9 @@ export class GameService {
     if (game.ownerPid !== pid) return err("forbidden", "You're not the caller for this game.");
     if (game.closedAt !== null) return err("closed", "That game is closed.");
     await this.#repo.removeCall(gameId, itemIndex);
-    // bingo_at is deliberately NOT cleared: a win that was announced to the
-    // raid should not silently un-happen.
+    // An undo means it never happened, so any bingo that rested on this call
+    // goes with it.
+    await this.#reconcileBingos(gameId);
     return ok(null);
   }
 
