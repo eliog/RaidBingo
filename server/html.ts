@@ -27,10 +27,10 @@ export interface LayoutOptions {
   title: string;
   body: string;
   /** Extra tags for <head> — already-escaped markup. */
-  head?: string;
+  head?: string | undefined;
   /** Serialised state for the client, exposed as window.__RB__. */
   state?: unknown;
-  module?: string;
+  module?: string | undefined;
 }
 
 export function layout(opts: LayoutOptions): string {

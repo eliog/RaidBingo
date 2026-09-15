@@ -12,7 +12,7 @@
  * paste time is what everyone sees for the life of that paste.
  */
 
-import { readdir, readFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { ITEM_COUNT, FREE_CELL } from "../shared/board.ts";
 
@@ -109,7 +109,7 @@ export function ogTags(state: OgState, baseUrl: string): string {
 
 /* ------------------------------------------------------------ rendering */
 
-let fontBuffers: Buffer[] | null = null;
+let fontPaths: string[] | null = null;
 
 /**
  * Fonts do not travel inside an SVG: the rasteriser needs the files. Drop
@@ -117,16 +117,16 @@ let fontBuffers: Buffer[] | null = null;
  * licences, since this repo is public). Without them the image still renders,
  * in whatever the host has.
  */
-async function loadFonts(): Promise<Buffer[]> {
-  if (fontBuffers !== null) return fontBuffers;
+async function loadFonts(): Promise<string[]> {
+  if (fontPaths !== null) return fontPaths;
   const dir = path.resolve(import.meta.dirname, "..", "fonts");
   try {
     const names = (await readdir(dir)).filter((f) => /\.(ttf|otf)$/i.test(f));
-    fontBuffers = await Promise.all(names.map((f) => readFile(path.join(dir, f))));
+    fontPaths = names.map((f) => path.join(dir, f));
   } catch {
-    fontBuffers = [];
+    fontPaths = [];
   }
-  return fontBuffers;
+  return fontPaths;
 }
 
 /** Discord will not render an SVG og:image, so this has to be a PNG. */
@@ -136,7 +136,8 @@ export async function ogPng(state: OgState): Promise<Buffer> {
   const resvg = new Resvg(ogSvg(state), {
     fitTo: { mode: "width", value: 1200 },
     font: {
-      fontBuffers: fontFiles,
+      fontFiles,
+      // Fall back to whatever the host has rather than rendering nothing.
       loadSystemFonts: fontFiles.length === 0,
       defaultFontFamily: "Alegreya Sans",
     },
