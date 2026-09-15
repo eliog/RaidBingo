@@ -144,6 +144,22 @@ test("the root shows the login view signed out and the lobby signed in", async (
   assert.match(inn.body, /"view":"lobby"/);
 });
 
+test("the api refuses any POST that is not application/json", async () => {
+  // text/plain is a CORS-simple content type, so a cross-origin request can
+  // send it with no preflight. SameSite=Lax already blocks the cookie; this
+  // means CSRF does not rest on that alone.
+  const h = app();
+  const cookie = await signIn(h);
+  for (const contentType of ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data"]) {
+    const res = await h.instance.inject({
+      method: "POST", url: "/api/games",
+      headers: { cookie, "content-type": contentType },
+      payload: '{"title":"x"}',
+    });
+    assert.equal(res.statusCode, 415, `${contentType} should be refused`);
+  }
+});
+
 test("the api refuses anonymous callers", async () => {
   const h = app();
   for (const url of ["/api/games/a-b-c", "/api/games"]) {

@@ -120,7 +120,20 @@ export class GameHub {
         if (ws.readyState === ws.OPEN) ws.send(text);
       }
     }
+  }
+
+  /**
+   * Drop everything. A socket left open keeps the event loop alive, so this
+   * has to terminate rather than politely close.
+   */
+  close(): void {
+    for (const room of this.#rooms.values()) {
+      for (const ws of room) ws.terminate();
+      room.clear();
+    }
+    this.#rooms.clear();
     this.#server?.close();
+    this.#server = null;
   }
 
   get roomCount(): number {

@@ -51,6 +51,10 @@ console.log(`raid bingo listening on ${config.baseUrl} (port ${config.port})`);
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
     hub.goodbye("restart");
-    void app.close().then(() => process.exit(0));
+    // A beat for the goodbye to flush before the sockets are torn down.
+    setTimeout(() => {
+      hub.close();
+      void app.close().then(() => process.exit(0));
+    }, 150);
   });
 }

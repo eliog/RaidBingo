@@ -59,6 +59,23 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
   // thing that needs a limiter.
   const joinLimiter = new RateLimiter(deps.clock, 10, 60_000);
 
+  /**
+   * Defence in depth against CSRF. SameSite=Lax already stops the session
+   * cookie riding a cross-site POST, but `text/plain` is a CORS-simple content
+   * type, so a cross-origin request can reach us without a preflight. Insisting
+   * on application/json means anything cross-origin needs a preflight it will
+   * not get, and CSRF no longer rests on a single control.
+   */
+  app.addHook("preHandler", async (request, reply) => {
+    if (request.method !== "POST" || !request.url.startsWith("/api/")) return;
+    const type = String(request.headers["content-type"] ?? "").split(";")[0]?.trim();
+    if (type !== "application/json") {
+      return reply.code(415).send({
+        error: { code: "invalid", message: "Send application/json." },
+      });
+    }
+  });
+
   const requirePid = async (
     request: FastifyRequest,
     reply: FastifyReply,
