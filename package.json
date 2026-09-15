@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/",
+    "test": "node --test tests/*.test.ts",
     "dev": "node --watch server/main.ts",
     "start": "node server/main.ts",
     "hooks": "git config core.hooksPath .githooks",
