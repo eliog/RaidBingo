@@ -5,7 +5,8 @@ import { currentPid } from "./auth.ts";
 import { RateLimiter } from "./rate-limit.ts";
 import { layout, errorPage } from "./html.ts";
 import { isWellFormedId } from "../shared/ids.ts";
-import { ITEM_COUNT } from "../shared/board.ts";
+import { ITEM_COUNT, FREE_CELL } from "../shared/board.ts";
+import { ogPng, ogTags, type OgState } from "./og.ts";
 
 const STATUS: Record<ServiceError["code"], number> = {
   not_found: 404,
@@ -23,10 +24,33 @@ function fail(reply: FastifyReply, error: ServiceError): FastifyReply {
 }
 
 /** The shell. The client renders from the state embedded in it. */
-function page(title: string, state: unknown): string {
+async function ogState(deps: Deps, id: string): Promise<OgState | null> {
+  const game = await deps.repo.getGame(id);
+  if (game === null) return null;
+  const calls = await deps.repo.callsFor(id);
+  const roster = await deps.repo.rosterFor(id);
+  // The board shown is a canonical order, not any one player's shuffle.
+  const calledCells: number[] = [];
+  let cell = 0;
+  for (let item = 0; item < ITEM_COUNT; item++) {
+    if (cell === FREE_CELL) cell++;
+    if (calls.has(item)) calledCells.push(cell);
+    cell++;
+  }
+  return {
+    id: game.id,
+    title: game.title,
+    players: roster.length,
+    calls: calls.size,
+    bingos: roster.filter((r) => r.bingoAt !== null).length,
+    calledCells,
+  };
+}
+
+function page(title: string, state: unknown, head?: string): string {
   // layout() escapes; escaping here too would double-encode an & in a title.
   const full = title === "Raid Bingo" ? title : `${title} — Raid Bingo`;
-  return layout({ title: full, body: '<div id="app"></div>', state, module: "app.js" });
+  return layout({ title: full, body: '<div id="app"></div>', state, module: "app.js", head });
 }
 
 export function registerRoutes(app: FastifyInstance, deps: Deps): void {
@@ -95,12 +119,13 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
         );
       }
       const roster = await deps.repo.rosterFor(id);
+      const og = await ogState(deps, id);
       return reply.type("text/html").send(
         page(game.title, {
           view: "login",
           returnTo: `/g/${id}`,
           invite: { id, title: game.title, players: roster.length, closed: game.closedAt !== null },
-        }),
+        }, og ? ogTags(og, deps.config.baseUrl) : undefined),
       );
     }
 
@@ -118,8 +143,20 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
         lastName: player?.lastNameUsed ?? null,
         calledCount: calls.size,
         game: view.value,
-      }),
+      }, (await ogState(deps, id).then((s) => (s ? ogTags(s, deps.config.baseUrl) : undefined)))),
     );
+  });
+
+  // Public on purpose: Discord's unfurler arrives with no cookie.
+  app.get<{ Params: { id: string } }>("/og/:id.png", async (request, reply) => {
+    const id = request.params.id.replace(/\.png$/, "");
+    if (!isWellFormedId(id)) return reply.code(404).send("not found");
+    const state = await ogState(deps, id);
+    if (state === null) return reply.code(404).send("not found");
+    return reply
+      .type("image/png")
+      .header("cache-control", "public, max-age=300")
+      .send(await ogPng(state));
   });
 
   // ------------------------------------------------------------------ api

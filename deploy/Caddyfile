@@ -1,0 +1,25 @@
+# Caddy obtains and renews the certificate automatically. No certbot, no cron.
+# Replace the hostname; everything else can stay.
+#
+# HSTS is NOT on by default, so it is set explicitly. `preload` is deliberately
+# left off: joining the preload list is easy and leaving it is painful.
+
+raidbingo.com {
+	reverse_proxy localhost:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	encode zstd gzip
+	log {
+		output file /var/log/caddy/raidbingo.log
+	}
+}
+
+# Optional: send www to the bare domain.
+# www.raidbingo.com {
+# 	redir https://raidbingo.com{uri} permanent
+# }

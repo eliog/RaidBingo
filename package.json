@@ -15,12 +15,13 @@
     "hooks": "git config core.hooksPath .githooks"
   },
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "fastify": "^5.2.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
     "@types/node": "^24.0.0",
-    "@types/ws": "^8.5.13"
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.7.0"
   }
 }

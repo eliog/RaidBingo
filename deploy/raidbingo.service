@@ -1,0 +1,31 @@
+[Unit]
+Description=Raid Bingo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=raidbingo
+WorkingDirectory=/srv/raidbingo
+
+# Secrets live here, not in this file and not in the repo.
+#   install -o root -g raidbingo -m 0640 /dev/null /etc/raidbingo/env
+EnvironmentFile=/etc/raidbingo/env
+
+ExecStart=/usr/bin/node server/main.ts
+Restart=always
+RestartSec=2
+
+# A deploy drops every websocket mid-raid. The app says goodbye on SIGTERM
+# before draining, so clients can tell a restart from a network blip.
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/raidbingo/data
+
+[Install]
+WantedBy=multi-user.target

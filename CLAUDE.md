@@ -3,7 +3,7 @@
 A web bingo game a WoW guild plays during raids. Someone posts a link in Discord, players
 log in, get a board, and the game owner calls squares as the raid unfolds.
 
-**Status:** spec complete, not yet implemented. Only `raid-bingo.html` exists (prototype).
+**Status:** built and tested end to end. `npm test` runs the suite; `node --env-file=.env server/main.ts` runs it. See README.md for setup and deployment.
 
 **This repo will be public.** Read [Security](#security) before writing any config code.
 
@@ -252,15 +252,14 @@ Visual design: dark is a deep purple-black stone (`#14101A`) with bone text and 
 square, and tapping a square opens a sheet with the full phrase at 17px. Clipped text is a
 bug, so a runtime guard grows the row and flags the cell if it still overflows.
 
-## Build order
+## Known gaps
 
-1. Security scaffolding and the four test seams — `.gitignore`, `.env.example`, fail-fast
-   config loader, gitleaks hook.
-2. Schema, sessions, Discord OAuth.
-3. Game server and board UI.
-4. Lobby: active games, history, join-by-ID.
-5. Owner screens: game creation (title + item picker with reuse) and owner controls.
-6. Open Graph tags.
+- The word pool is 243 words (14.2M ordered triples) against the ~512 target above.
+  Growing it is just appending to `WORDS` in `shared/ids.ts`.
+- `fonts/` is empty. The link-preview image renders in fallback faces until the three
+  OFL fonts are dropped in — see `fonts/README.md`.
+- No Playwright end-to-end test yet; the call/undo path is covered at the service and
+  HTTP layers only.
 
 ## Not in scope
 
