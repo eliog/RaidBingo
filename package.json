@@ -12,7 +12,8 @@
     "test": "node --test tests/",
     "dev": "node --watch server/main.ts",
     "start": "node server/main.ts",
-    "hooks": "git config core.hooksPath .githooks"
+    "hooks": "git config core.hooksPath .githooks",
+    "seed": "node --env-file=.env scripts/seed-demo.ts"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
