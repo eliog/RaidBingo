@@ -112,10 +112,23 @@ test("logging out clears the cookie and the session row", async () => {
   assert.equal(after.statusCode, 401);
 });
 
+test("a title with an ampersand is escaped exactly once", async () => {
+  const h = app();
+  const cookie = await signIn(h);
+  const { id } = (await h.instance.inject({
+    method: "POST", url: "/api/games", headers: { cookie },
+    payload: { title: "Sun & Moon", items: items() },
+  })).json() as { id: string };
+  const res = await h.instance.inject({ method: "GET", url: `/g/${id}`, headers: { cookie } });
+  assert.match(res.body, /<title>Sun &amp; Moon — Raid Bingo<\/title>/);
+  assert.ok(!res.body.includes("&amp;amp;"));
+});
+
 test("the root shows the login view signed out and the lobby signed in", async () => {
   const h = app();
   const out = await h.instance.inject({ method: "GET", url: "/" });
   assert.match(out.body, /"view":"login"/);
+  assert.match(out.body, /<title>Raid Bingo<\/title>/);
 
   const cookie = await signIn(h);
   const inn = await h.instance.inject({ method: "GET", url: "/", headers: { cookie } });

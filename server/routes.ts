@@ -1,9 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { Deps } from "./app.ts";
+import { notifyGame, type Deps } from "./app.ts";
 import { GameService, type ServiceError } from "./game-service.ts";
 import { currentPid } from "./auth.ts";
 import { RateLimiter } from "./rate-limit.ts";
-import { layout, errorPage, esc } from "./html.ts";
+import { layout, errorPage } from "./html.ts";
 import { isWellFormedId } from "../shared/ids.ts";
 import { ITEM_COUNT } from "../shared/board.ts";
 
@@ -24,7 +24,9 @@ function fail(reply: FastifyReply, error: ServiceError): FastifyReply {
 
 /** The shell. The client renders from the state embedded in it. */
 function page(title: string, state: unknown): string {
-  return layout({ title: `${esc(title)} — Raid Bingo`, body: '<div id="app"></div>', state, module: "app.js" });
+  // layout() escapes; escaping here too would double-encode an & in a title.
+  const full = title === "Raid Bingo" ? title : `${title} — Raid Bingo`;
+  return layout({ title: full, body: '<div id="app"></div>', state, module: "app.js" });
 }
 
 export function registerRoutes(app: FastifyInstance, deps: Deps): void {
@@ -154,6 +156,7 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
       }
       const name = (request.body ?? {}).charName;
       const joined = await service.joinGame(pid, request.params.id, typeof name === "string" ? name : "");
+      if (joined.ok) notifyGame(request.params.id);
       return joined.ok ? reply.send(joined.value) : fail(reply, joined.error);
     },
   );
@@ -166,6 +169,8 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
       const item = Number((request.body ?? {}).item);
       const called = await service.call(pid, request.params.id, item);
       if (!called.ok) return fail(reply, called.error);
+      notifyGame(request.params.id);
+      notifyGame(request.params.id);
       const view = await service.view(pid, request.params.id);
       return reply.send({ winners: called.value.winners, game: view.ok ? view.value : null });
     },
@@ -179,6 +184,8 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
       const item = Number((request.body ?? {}).item);
       const undone = await service.undo(pid, request.params.id, item);
       if (!undone.ok) return fail(reply, undone.error);
+      notifyGame(request.params.id);
+      notifyGame(request.params.id);
       const view = await service.view(pid, request.params.id);
       return reply.send({ game: view.ok ? view.value : null });
     },
@@ -211,6 +218,7 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
     const pid = await requirePid(request, reply);
     if (pid === null) return reply;
     const r = await service.closeGame(pid, request.params.id);
+    if (r.ok) notifyGame(request.params.id);
     return r.ok ? reply.send({ ok: true }) : fail(reply, r.error);
   });
 }
