@@ -104,7 +104,11 @@ Three distinct words from a curated pool of ~512 WoW words, e.g.
 
 Small DigitalOcean droplet.
 
-- **TypeScript on Node 24 LTS** — Fastify, `ws`
+- **TypeScript on Node 24 LTS** — Fastify, `ws`. Run directly, no build step: Node strips
+  types at load. That means **only erasable syntax** — no parameter properties
+  (`constructor(readonly x: T)`), no enums, no namespaces, no decorators, since those
+  emit code rather than just disappearing. `erasableSyntaxOnly` is on so `npm run
+  typecheck` catches it instead of the runtime.
 - **SQLite** via the built-in `node:sqlite` (WAL) — no native dependencies, so the Docker
   image is a plain `node:24-slim` with no build toolchain
 - Discord OAuth2 handled directly; no Discord library needed
