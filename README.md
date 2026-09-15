@@ -99,6 +99,14 @@ npm run typecheck # tsc --noEmit
 Tests never touch the real Discord API and never need a database file: Discord is behind
 an interface with a recording fake, and every database test gets its own in-memory SQLite.
 
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+Note that anything you drop into `fonts/` keeps its own licence. The three
+faces the link-preview image expects are all OFL, which requires their licence
+text to travel with them, so check each `OFL.txt` in beside its font.
+
 ## Contributing
 
 Please run `npm run hooks` once. It points git at `.githooks`, which runs **gitleaks**
