@@ -320,6 +320,47 @@ test("a closed game refuses new joins", async () => {
   assert.equal(join.ok ? "" : join.error.code, "closed");
 });
 
+test("a finished game is still fully readable a year later", async () => {
+  // History is kept indefinitely: closing a game marks it, it never deletes it.
+  const h = await withGame();
+  const joined = await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
+  await h.service.joinGame(BOB, h.gameId, "Bonkgrog");
+  assert.ok(joined.ok);
+  const board = joined.value.board as number[];
+
+  for (const p of [0, 1, 2, 3, 4]) await h.service.call(OWNER, h.gameId, board[p] as number);
+  await h.service.call(OWNER, h.gameId, board[7] as number);
+  await h.service.closeGame(OWNER, h.gameId);
+
+  const wonAt = (await h.service.view(ALICE, h.gameId) as { value: { roster: { charName: string; bingoAt: number | null }[] } })
+    .value.roster.find((r) => r.charName === "Thalgrim")?.bingoAt;
+  assert.ok(wonAt);
+
+  h.clock.advance(365 * 24 * 60 * 60 * 1000);
+
+  const later = await h.service.view(ALICE, h.gameId);
+  assert.ok(later.ok, "a closed game must still be readable");
+  assert.equal(later.value.closed, true);
+  assert.equal(later.value.title, "Tuesday BT run");
+  assert.deepEqual(later.value.board, board, "the board must come back identical");
+  assert.equal(later.value.called.length, 6, "every call is still there");
+  assert.equal(later.value.items.length, ITEM_COUNT, "the squares are still readable");
+
+  const mine = later.value.roster.find((r) => r.charName === "Thalgrim");
+  assert.equal(mine?.bingoAt, wonAt, "the win, and when it happened, survive");
+  assert.equal(later.value.roster[0]?.charName, "Thalgrim", "winners still sort first");
+
+  // And it is still listed as a past game, for both of them.
+  for (const pid of [ALICE, BOB]) {
+    const lobby = await h.service.lobby(pid);
+    assert.deepEqual(lobby.active, [], "a closed game is not still playing");
+    assert.deepEqual(lobby.past.map((g) => g.title), ["Tuesday BT run"]);
+  }
+  const alicePast = (await h.service.lobby(ALICE)).past[0];
+  assert.equal(alicePast?.bingoAt, wonAt, "history remembers that you won");
+  assert.equal((await h.service.lobby(BOB)).past[0]?.bingoAt, null, "and that Bob did not");
+});
+
 test("a game that does not exist is not found, never a crash", async () => {
   const h = await withGame();
   for (const r of [

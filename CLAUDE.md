@@ -45,7 +45,10 @@ Concurrent games are supported. Each has its own title, items, owner, roster and
   designated-host list.
 - Every game has a **title** set at creation (e.g. "Tuesday BT run") — the human label,
   distinct from the ID. Shown in the lobby, history, board header and OG preview.
-- Games auto-close after ~8h idle.
+- Games auto-close after ~8h idle. **Closing marks a game, it never deletes one** —
+  nothing in the app deletes a game or a board, and the history query has no limit or
+  date filter, so a finished night stays readable indefinitely: the board, every call,
+  who won and when. A test closes a game and reads it back a year later.
 - Rate-limit game creation per `pid` (a few a day).
 
 Owner-only functions:
