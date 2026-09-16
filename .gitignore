@@ -18,3 +18,8 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# fonts are fetched per-deployment, not committed (see fonts/README.md)
+fonts/*.ttf
+fonts/*.otf
+fonts/OFL-*.txt
