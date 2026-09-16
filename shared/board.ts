@@ -71,6 +71,21 @@ export function winningCells(
   return won;
 }
 
+/**
+ * The most marks on any single line, 0-5. This — not the mark count — is how
+ * close a player actually is: every board holds every item, so mark counts are
+ * identical for everyone and only the arrangement differs.
+ */
+export function bestLineOf(board: readonly number[], called: ReadonlySet<number>): number {
+  let best = 0;
+  for (const line of LINES) {
+    let n = 0;
+    for (const p of line) if (isMarked(board, p, called)) n++;
+    if (n > best) best = n;
+  }
+  return best;
+}
+
 export function hasBingo(board: readonly number[], called: ReadonlySet<number>): boolean {
   return LINES.some((line) => line.every((p) => isMarked(board, p, called)));
 }

@@ -2,7 +2,7 @@
  * The whole client. Imports the same board and validation modules the server
  * runs — served from /shared with types stripped at request time.
  */
-import { winningCells, isMarked, LINES, FREE, FREE_CELL, ITEM_COUNT } from "/shared/board.js";
+import { winningCells, bestLineOf, FREE, FREE_CELL, ITEM_COUNT } from "/shared/board.js";
 import { checkItems, validateCharName, ITEM_MAX, ITEM_SOFT_MAX } from "/shared/validate.js";
 
 const S = window.__RB__ ?? { view: "login", returnTo: "/" };
@@ -116,7 +116,7 @@ function gameCard(g) {
     h("p", { class: "mono", text: g.id }),
     h("div", { class: "row" },
       h("span", { class: "bar" }, Array.from({ length: 5 }, (_, i) => h("i", { class: i < filled ? "on" : "" }))),
-      h("span", { class: "dim tabular" }, `${g.marks} of 25 marked`)),
+      h("span", { class: "dim tabular" }, `${g.called} of ${ITEM_COUNT} called`)),
     h("div", { class: "row dim" },
       h("span", null, `${g.players} ${g.players === 1 ? "player" : "players"}`),
       h("span", null, "·"), h("span", null, `as ${g.charName}`),
@@ -439,10 +439,7 @@ function renderBoard() {
         })();
 
     tallyCalled.textContent = `${calledSet.size}/${ITEM_COUNT}`;
-    const best = Math.max(...[[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
-      [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],[0,6,12,18,24],[4,8,12,16,20]]
-      .map((line) => line.filter((p) => isMarked(board, p, calledSet)).length));
-    tallyLine.textContent = `${best}/5`;
+    tallyLine.textContent = `${bestLineOf(board, calledSet)}/5`;
     tallyRaid.textContent = String(game.roster.length);
 
     const me = game.roster.find((r) => r.charName === game.charName);
@@ -477,7 +474,8 @@ function renderBoard() {
           role: "button", "aria-label": `See ${r.charName}'s board` },
         h("span", { class: "nm", text: r.charName }),
         r.bingoAt ? h("span", { class: "badge" }, "BINGO") : null,
-        h("span", { class: "dim tabular" }, `${r.marks}/25`),
+        h("span", { class: "dim tabular" },
+          r.bingoAt ? "\u2713" : r.bestLine === 4 ? "1 away" : `${5 - r.bestLine} away`),
         grant);
       // Hover where there is a pointer, tap or keyboard where there is not.
       row.addEventListener("mouseenter", () => showPeek(r, row));
@@ -519,9 +517,7 @@ function renderBoard() {
       }));
     });
     // The interesting number is not how many they have, it is how few they need.
-    const best = LINES.reduce((n, line) =>
-      Math.max(n, line.filter((pos) => isMarked(entry.board, pos, calledSet)).length), 0);
-    const need = 5 - best;
+    const need = 5 - entry.bestLine;
     return h("div", { class: "peek" },
       h("div", { class: "row", style: "gap:8px" },
         h("span", { style: "font-family:Cinzel,Georgia,serif;font-weight:700", text: entry.charName }),
@@ -530,7 +526,7 @@ function renderBoard() {
       h("p", { class: "dim" },
         entry.bingoAt ? `Five in a row at ${clock(entry.bingoAt)}.`
         : need === 1 ? "One square from a line."
-        : `${entry.marks}/25 marked \u00b7 ${need} from a line.`));
+        : `${need} squares from a line.`));
   }
 
   let peek = null;

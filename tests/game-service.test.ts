@@ -200,7 +200,7 @@ test("a late joiner inherits every call already made", async () => {
   const late = await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
   assert.ok(late.ok);
   assert.equal(late.value.called.length, 3);
-  assert.ok((late.value.roster.find((r) => r.you)?.marks ?? 0) >= 1);
+  assert.ok((late.value.roster.find((r) => r.you)?.bestLine ?? 0) >= 1);
 });
 
 test("the view never contains a pid", async () => {

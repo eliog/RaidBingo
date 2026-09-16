@@ -31,6 +31,10 @@ numbers, no content tables. The app never talks to the game client.
   a line some other way keeps theirs, with their original time. Re-calling restores it.
 - No player voting, no pending state: a square is called or it is not.
 - Win is five in a row: row, column or diagonal.
+- **Mark counts are identical for every player, always.** Every board holds all 24 items
+  and calls are global, so everyone has exactly `called + 1` marks. Arrangement is the
+  only variable, so rank and display on `bestLineOf` — how close someone is to a line —
+  never on a mark count. A marks column would show one number for the whole raid.
 - The night continues past the first bingo; winners are ranked by time.
 
 ## Games

@@ -5,7 +5,7 @@
 
 import type { Repository, GameRow } from "./ports.ts";
 import type { Clock, Rng } from "../shared/seams.ts";
-import { dealBoard, hasBingo, markCount, ITEM_COUNT } from "../shared/board.ts";
+import { dealBoard, hasBingo, markCount, bestLineOf, ITEM_COUNT } from "../shared/board.ts";
 import { generateId } from "../shared/ids.ts";
 import { checkItems, validateCharName, validateTitle, normalizeCharName } from "../shared/validate.ts";
 
@@ -34,7 +34,15 @@ const err = (code: ErrorCode, message: string, extra?: Partial<ServiceError>): R
 
 export interface RosterEntry {
   charName: string;
-  marks: number;
+  /**
+   * The most marks on any one line, 0-5.
+   *
+   * NOT a mark count: every player holds all 24 items and calls are global, so
+   * everyone always has exactly `called + 1` marks. Arrangement is the only
+   * variable, so how close someone is to a line is the only thing worth
+   * ranking on.
+   */
+  bestLine: number;
   bingoAt: number | null;
   /** True for the viewer's own row, so the client can highlight it. */
   you: boolean;
@@ -337,7 +345,7 @@ export class GameService {
       roster: roster
         .map((r) => ({
           charName: r.charName,
-          marks: markCount(r.board, called),
+          bestLine: bestLineOf(r.board, called),
           bingoAt: r.bingoAt,
           you: r.pid === pid,
           canCall: r.pid === game.ownerPid || r.canCall,
@@ -347,7 +355,7 @@ export class GameService {
         .sort((a, b) => {
           if ((a.bingoAt === null) !== (b.bingoAt === null)) return a.bingoAt === null ? 1 : -1;
           if (a.bingoAt !== null && b.bingoAt !== null) return a.bingoAt - b.bingoAt;
-          return b.marks - a.marks;
+          return b.bestLine - a.bestLine;
         }),
     });
   }

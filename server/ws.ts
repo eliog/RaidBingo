@@ -16,13 +16,13 @@ import type { Server } from "node:http";
 import type { Deps } from "./app.ts";
 import { parseCookies, SESSION_COOKIE } from "./auth.ts";
 import { hashSessionToken } from "./identity.ts";
-import { markCount } from "../shared/board.ts";
+import { bestLineOf } from "../shared/board.ts";
 
 export interface LivePayload {
   type: "state";
   called: [number, number][];
   roster: {
-    charName: string; marks: number; bingoAt: number | null;
+    charName: string; bestLine: number; bingoAt: number | null;
     canCall: boolean; isOwner: boolean; board: number[];
   }[];
   closed: boolean;
@@ -99,7 +99,7 @@ export class GameHub {
       roster: roster
         .map((r) => ({
           charName: r.charName,
-          marks: markCount(r.board, called),
+          bestLine: bestLineOf(r.board, called),
           bingoAt: r.bingoAt,
           canCall: r.pid === game.ownerPid || r.canCall,
           isOwner: r.pid === game.ownerPid,
@@ -108,7 +108,7 @@ export class GameHub {
         .sort((a, b) => {
           if ((a.bingoAt === null) !== (b.bingoAt === null)) return a.bingoAt === null ? 1 : -1;
           if (a.bingoAt !== null && b.bingoAt !== null) return a.bingoAt - b.bingoAt;
-          return b.marks - a.marks;
+          return b.bestLine - a.bestLine;
         }),
       closed: game.closedAt !== null,
     };

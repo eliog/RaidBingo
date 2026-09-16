@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   BOARD_CELLS, ITEM_COUNT, FREE_CELL, FREE, LINES,
-  dealBoard, isMarked, winningCells, hasBingo, markCount, isValidBoard,
+  dealBoard, isMarked, winningCells, hasBingo, markCount, bestLineOf, isValidBoard,
 } from "../shared/board.ts";
 import { seededRng, cryptoRng } from "../shared/seams.ts";
 
@@ -70,6 +70,28 @@ test("calling every item marks the whole board", () => {
   const board = dealBoard(seededRng(13));
   const all = new Set(Array.from({ length: ITEM_COUNT }, (_, i) => i));
   assert.equal(markCount(board, all), BOARD_CELLS);
+});
+
+test("every player always has the SAME number of marks — only the line differs", () => {
+  // Every board holds all 24 items and calls are global, so a mark count can
+  // never distinguish players. This is why the roster ranks on bestLineOf and
+  // not on markCount; a marks column would show one number for everybody.
+  const boards = Array.from({ length: 8 }, (_, i) => dealBoard(seededRng(i + 1)));
+  const called = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+
+  const marks = new Set(boards.map((b) => markCount(b, called)));
+  assert.equal(marks.size, 1, "mark counts differed, which should be impossible");
+  assert.equal([...marks][0], called.size + 1, "marks are always the calls plus the free centre");
+
+  const lines = new Set(boards.map((b) => bestLineOf(b, called)));
+  assert.ok(lines.size > 1, "arrangement should separate players even when marks cannot");
+});
+
+test("bestLineOf counts the fullest line, and the free centre counts toward it", () => {
+  const board = dealBoard(seededRng(4));
+  assert.equal(bestLineOf(board, new Set()), 1, "the free centre alone is one");
+  const diagonal = [0, 6, 18, 24].map((p) => board[p] as number);
+  assert.equal(bestLineOf(board, new Set(diagonal)), 5, "four items plus the free centre wins");
 });
 
 test("isValidBoard rejects boards that could not have been dealt", () => {
