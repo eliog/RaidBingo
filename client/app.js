@@ -2,7 +2,7 @@
  * The whole client. Imports the same board and validation modules the server
  * runs — served from /shared with types stripped at request time.
  */
-import { winningCells, isMarked, FREE, FREE_CELL, ITEM_COUNT } from "/shared/board.js";
+import { winningCells, isMarked, LINES, FREE, FREE_CELL, ITEM_COUNT } from "/shared/board.js";
 import { checkItems, validateCharName, ITEM_MAX, ITEM_SOFT_MAX } from "/shared/validate.js";
 
 const S = window.__RB__ ?? { view: "login", returnTo: "/" };
@@ -394,6 +394,7 @@ function renderBoard() {
   }
 
   function draw() {
+    hidePeek();
     const calledSet = new Set(called.keys());
     const wins = winningCells(board, calledSet);
     clear(grid);
@@ -472,11 +473,22 @@ function renderBoard() {
         : r.canCall
           ? h("span", { class: "dim", title: r.isOwner ? "Owner" : "Caller" }, "⚑")
           : null;
-      rosterBody.append(h("div", { class: `lrow ${r.you ? "me" : ""}` },
+      const row = h("div", { class: `lrow peekable ${r.you ? "me" : ""}`, tabindex: "0",
+          role: "button", "aria-label": `See ${r.charName}'s board` },
         h("span", { class: "nm", text: r.charName }),
         r.bingoAt ? h("span", { class: "badge" }, "BINGO") : null,
         h("span", { class: "dim tabular" }, `${r.marks}/25`),
-        grant));
+        grant);
+      // Hover where there is a pointer, tap or keyboard where there is not.
+      row.addEventListener("mouseenter", () => showPeek(r, row));
+      row.addEventListener("mouseleave", hidePeek);
+      row.addEventListener("focus", () => showPeek(r, row));
+      row.addEventListener("blur", hidePeek);
+      row.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;   // the grant control
+        window.innerWidth < 700 ? peekSheet(r) : showPeek(r, row);
+      });
+      rosterBody.append(row);
     }
 
     clear(logBody);
@@ -491,6 +503,59 @@ function renderBoard() {
     }
 
     fit();
+  }
+
+  /* ---- a peek at someone else's board ------------------------------- */
+
+  function miniBoard(entry) {
+    const calledSet = new Set(called.keys());
+    const wins = winningCells(entry.board, calledSet);
+    const grid = h("div", { class: "mini" });
+    entry.board.forEach((item, pos) => {
+      const on = pos === FREE_CELL || calledSet.has(item);
+      grid.append(h("i", {
+        class: wins.has(pos) ? "win" : on ? "on" : "",
+        title: pos === FREE_CELL ? "Hearthstone" : game.items[item],
+      }));
+    });
+    // The interesting number is not how many they have, it is how few they need.
+    const best = LINES.reduce((n, line) =>
+      Math.max(n, line.filter((pos) => isMarked(entry.board, pos, calledSet)).length), 0);
+    const need = 5 - best;
+    return h("div", { class: "peek" },
+      h("div", { class: "row", style: "gap:8px" },
+        h("span", { style: "font-family:Cinzel,Georgia,serif;font-weight:700", text: entry.charName }),
+        entry.bingoAt ? h("span", { class: "badge" }, "BINGO") : null),
+      grid,
+      h("p", { class: "dim" },
+        entry.bingoAt ? `Five in a row at ${clock(entry.bingoAt)}.`
+        : need === 1 ? "One square from a line."
+        : `${entry.marks}/25 marked \u00b7 ${need} from a line.`));
+  }
+
+  let peek = null;
+  function showPeek(entry, anchor) {
+    hidePeek();
+    if (window.innerWidth < 700) { peekSheet(entry); return; }
+    peek = miniBoard(entry);
+    peek.classList.add("floating");
+    document.body.append(peek);
+    const box = anchor.getBoundingClientRect();
+    const top = Math.min(box.top + window.scrollY, window.scrollY + window.innerHeight - peek.offsetHeight - 12);
+    peek.style.top = `${Math.max(window.scrollY + 8, top)}px`;
+    peek.style.left = `${Math.max(8, box.left - peek.offsetWidth - 12)}px`;
+  }
+  function hidePeek() { peek?.remove(); peek = null; }
+
+  function peekSheet(entry) {
+    const scrim = h("div", { class: "sheet-scrim", onclick: close });
+    const sheet = h("div", { class: "sheet", role: "dialog", "aria-modal": "true" },
+      h("div", { class: "grab" }), miniBoard(entry),
+      h("button", { class: "btn quiet block", onclick: close }, "Close"));
+    function close() { scrim.remove(); sheet.remove(); document.removeEventListener("keydown", esc); }
+    function esc(e) { if (e.key === "Escape") close(); }
+    document.addEventListener("keydown", esc);
+    document.body.append(scrim, sheet);
   }
 
   async function setCaller(charName, canCall) {

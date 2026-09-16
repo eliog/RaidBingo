@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { harness, items, T0 } from "./helpers.ts";
 import { IDLE_CLOSE_MS, GAMES_PER_DAY } from "../server/game-service.ts";
-import { ITEM_COUNT } from "../shared/board.ts";
+import { ITEM_COUNT, isValidBoard } from "../shared/board.ts";
 
 const OWNER = "owner-pid";
 const ALICE = "alice-pid";
@@ -212,6 +212,29 @@ test("the view never contains a pid", async () => {
   for (const pid of [OWNER, ALICE, BOB]) {
     assert.ok(!json.includes(pid), `${pid} leaked into the client view`);
   }
+});
+
+test("the roster carries each player's board, so others can see how close they are", async () => {
+  const h = await withGame();
+  const alice = await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
+  const bob = await h.service.joinGame(BOB, h.gameId, "Bonkgrog");
+  assert.ok(alice.ok && bob.ok);
+
+  const view = await h.service.view(BOB, h.gameId);
+  assert.ok(view.ok);
+  const byName = Object.fromEntries(view.value.roster.map((r) => [r.charName, r]));
+
+  for (const name of ["Thalgrim", "Bonkgrog"]) {
+    const board = byName[name]?.board;
+    assert.ok(Array.isArray(board), `${name} has no board`);
+    assert.ok(isValidBoard(board), `${name}'s board is not a real deal`);
+  }
+  // Same items, different order — that is the whole game.
+  assert.notDeepEqual(byName["Thalgrim"]?.board, byName["Bonkgrog"]?.board);
+  assert.deepEqual(byName["Thalgrim"]?.board, alice.value.board);
+
+  // Boards are not sensitive, but pids remain absent.
+  assert.ok(!JSON.stringify(view.value).includes(ALICE));
 });
 
 test("the roster puts winners first by time, then by marks", async () => {

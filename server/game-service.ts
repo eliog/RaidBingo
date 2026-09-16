@@ -42,6 +42,8 @@ export interface RosterEntry {
   canCall: boolean;
   /** The owner, who may also grant calling, edit the title and close. */
   isOwner: boolean;
+  /** Their dealt board, so others can see how close they are. Fixed at join. */
+  board: number[];
 }
 
 export interface GameView {
@@ -340,6 +342,7 @@ export class GameService {
           you: r.pid === pid,
           canCall: r.pid === game.ownerPid || r.canCall,
           isOwner: r.pid === game.ownerPid,
+          board: r.board,
         }))
         .sort((a, b) => {
           if ((a.bingoAt === null) !== (b.bingoAt === null)) return a.bingoAt === null ? 1 : -1;

@@ -224,3 +224,15 @@ textarea{min-height:160px;resize:vertical;line-height:1.5}
 .bar i{width:16px;height:5px;border-radius:1px;background:var(--line);display:block}
 .bar i.on{background:var(--fel)}
 .grid-2{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+
+/* ---------------------------------------------------- peek at a board */
+.lrow.peekable{cursor:pointer}
+.lrow.peekable:hover,.lrow.peekable:focus-visible{background:var(--raised)}
+.peek{display:flex;flex-direction:column;gap:9px}
+.peek.floating{position:absolute;z-index:55;width:190px;padding:14px;
+  background:var(--raised);border:1px solid var(--line);border-radius:3px;box-shadow:var(--shadow)}
+.mini{display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
+.mini i{aspect-ratio:1;border-radius:1px;background:var(--surface);border:1px solid var(--line);display:block}
+.mini i.on{background:var(--fel-wash);border-color:var(--fel)}
+.mini i.win{background:var(--fel);border-color:var(--fel)}
+@media (min-width:700px){ .sheet .mini{max-width:260px;margin:0 auto} }
