@@ -26,3 +26,6 @@ fonts/OFL-*.txt
 
 # guild squares name real people; keep them out of a public repo
 presets.json
+
+# working notes, not for the public repo
+MEMORY.md

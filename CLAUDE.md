@@ -5,7 +5,10 @@ log in, get a board, and the game owner calls squares as the raid unfolds.
 
 **Status:** built and tested end to end. `npm test` runs the suite; `node --env-file=.env server/main.ts` runs it. See README.md for setup and deployment.
 
-**This repo will be public.** Read [Security](#security) before writing any config code.
+**This repo is public.** Read [Security](#security) before writing any config code.
+
+Deployment state, open tasks and hard-won gotchas live in `MEMORY.md`, which is not
+committed. Read it first when picking this up again.
 
 **Not tied to any WoW version or expansion.** No expansion-specific logic, no patch
 numbers, no content tables. The app never talks to the game client.
