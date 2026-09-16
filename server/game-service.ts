@@ -5,7 +5,7 @@
 
 import type { Repository, GameRow } from "./ports.ts";
 import type { Clock, Rng } from "../shared/seams.ts";
-import { dealBoard, hasBingo, markCount, bestLineOf, ITEM_COUNT } from "../shared/board.ts";
+import { dealUniqueBoard, hasBingo, markCount, bestLineOf, ITEM_COUNT } from "../shared/board.ts";
 import { generateId } from "../shared/ids.ts";
 import { checkItems, validateCharName, validateTitle, normalizeCharName } from "../shared/validate.ts";
 
@@ -224,9 +224,11 @@ export class GameService {
       await this.#repo.freezeGameItems(gameId);
     }
 
+    // No two players in one game hold the same board, by construction.
+    const taken = (await this.#repo.rosterFor(gameId)).map((r) => r.board);
     await this.#repo.addGamePlayer({
       gameId, pid, charName: normalizeCharName(name.value),
-      board: dealBoard(this.#rng), joinedAt: now, bingoAt: null, canCall: false,
+      board: dealUniqueBoard(this.#rng, taken), joinedAt: now, bingoAt: null, canCall: false,
     });
     await this.#repo.setLastNameUsed(pid, normalizeCharName(name.value));
 

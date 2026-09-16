@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   BOARD_CELLS, ITEM_COUNT, FREE_CELL, FREE, LINES,
-  dealBoard, isMarked, winningCells, hasBingo, markCount, bestLineOf, isValidBoard,
+  dealBoard, dealUniqueBoard, isMarked, winningCells, hasBingo, markCount, bestLineOf, isValidBoard,
 } from "../shared/board.ts";
 import { seededRng, cryptoRng } from "../shared/seams.ts";
 
@@ -92,6 +92,33 @@ test("bestLineOf counts the fullest line, and the free centre counts toward it",
   assert.equal(bestLineOf(board, new Set()), 1, "the free centre alone is one");
   const diagonal = [0, 6, 18, 24].map((p) => board[p] as number);
   assert.equal(bestLineOf(board, new Set(diagonal)), 5, "four items plus the free centre wins");
+});
+
+test("a dealt board is never one another player already holds", () => {
+  const taken: number[][] = [];
+  const rng = seededRng(21);
+  for (let i = 0; i < 30; i++) {
+    const board = dealUniqueBoard(rng, taken);
+    assert.ok(isValidBoard(board));
+    assert.ok(!taken.some((t) => t.join() === board.join()), `board ${i} duplicated an earlier one`);
+    taken.push(board);
+  }
+});
+
+test("a degenerate rng cannot hand two players the same board", () => {
+  // The birthday odds are 1 in 2e21, so this is not what the guarantee is for.
+  // It is for an rng that is broken or misconfigured, where every deal repeats.
+  const stuck = { int: () => 0 };
+  const first = dealUniqueBoard(stuck, []);
+  const second = dealUniqueBoard(stuck, [first]);
+  const third = dealUniqueBoard(stuck, [first, second]);
+
+  assert.notDeepEqual(first, second);
+  assert.notDeepEqual(second, third);
+  assert.notDeepEqual(first, third);
+  for (const b of [first, second, third]) {
+    assert.ok(isValidBoard(b), "forcing uniqueness must still produce a legal board");
+  }
 });
 
 test("isValidBoard rejects boards that could not have been dealt", () => {

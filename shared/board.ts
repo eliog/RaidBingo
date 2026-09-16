@@ -36,6 +36,42 @@ export function dealBoard(rng: Rng): number[] {
   return [...items.slice(0, FREE_CELL), FREE, ...items.slice(FREE_CELL)];
 }
 
+const boardKey = (board: readonly number[]): string => board.join(",");
+
+/**
+ * Deal a board that nobody in this game already holds.
+ *
+ * With 24! ≈ 6.2e23 arrangements, two of 25 players colliding by chance is
+ * about 1 in 2e21 — it will not happen. The reason this exists is a broken or
+ * misconfigured source of randomness, where it would happen constantly and
+ * silently. So the collision is resolved by construction rather than trusted
+ * to probability: re-deal a few times, and if the randomness is degenerate
+ * enough that every deal repeats, swap positions until the board is unique.
+ */
+export function dealUniqueBoard(rng: Rng, taken: readonly (readonly number[])[]): number[] {
+  const seen = new Set(taken.map(boardKey));
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const board = dealBoard(rng);
+    if (!seen.has(boardKey(board))) return board;
+  }
+
+  // Degenerate rng. Force a difference rather than hand out a twin.
+  const board = dealBoard(rng);
+  for (let i = 0; i < BOARD_CELLS; i++) {
+    if (i === FREE_CELL) continue;
+    for (let j = i + 1; j < BOARD_CELLS; j++) {
+      if (j === FREE_CELL) continue;
+      const swapped = [...board];
+      const a = swapped[i] as number;
+      swapped[i] = swapped[j] as number;
+      swapped[j] = a;
+      if (!seen.has(boardKey(swapped))) return swapped;
+    }
+  }
+  return board; // would need more players than there are pairs of cells
+}
+
 /** The twelve ways to win: five rows, five columns, two diagonals. */
 export const LINES: readonly (readonly number[])[] = (() => {
   const out: number[][] = [];

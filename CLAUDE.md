@@ -229,6 +229,10 @@ Vitest dependency.
   Wednesday. The owner is a caller implicitly and carries no flag.
 - **Boards are stored, not derived.** Deal once, server-side, at join time, with
   `crypto.randomInt`, writing 24 item indices to `game_players.board_json`.
+- **No two players in a game hold the same board**, guaranteed by `dealUniqueBoard`
+  rather than by probability. 24! is 6.2e23, so two of 25 players colliding by chance is
+  about 1 in 2e21 — the check exists for a broken or misconfigured rng, where it would
+  happen constantly and silently, not for the birthday odds.
 - **Freeze `games.items_json` once the first non-owner joins.** Boards are indices into it.
 - **Never send another player's `pid` to the client.** The roster needs `char_name` only.
 

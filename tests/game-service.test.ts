@@ -237,6 +237,19 @@ test("the roster carries each player's board, so others can see how close they a
   assert.ok(!JSON.stringify(view.value).includes(ALICE));
 });
 
+test("no two players in a game are dealt the same board", async () => {
+  const h = await withGame();
+  const names = ["Thalgrim", "Bonkgrog", "Mirelle", "Kaelen", "Sylva"];
+  for (const [i, name] of names.entries()) {
+    await h.repo.upsertPlayer(`p${i}`, T0);
+    assert.ok((await h.service.joinGame(`p${i}`, h.gameId, name)).ok);
+  }
+  const view = await h.service.view("p0", h.gameId);
+  assert.ok(view.ok);
+  const keys = view.value.roster.map((r) => r.board.join());
+  assert.equal(new Set(keys).size, keys.length, "two players share a board");
+});
+
 test("the roster puts winners first by time, then by marks", async () => {
   const h = await withGame();
   const a = await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
