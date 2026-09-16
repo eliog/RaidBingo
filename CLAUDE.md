@@ -14,8 +14,11 @@ numbers, no content tables. The app never talks to the game client.
 
 - 5x5 board: 24 items plus a free centre square.
 - Every player gets the **same 24 items in a different order**.
-- **The owner calls squares.** A call ticks on every board at once. The owner can undo any
-  call — one click on the same square, not buried in a menu.
+- **Callers call squares.** A call ticks on every board at once, and can be undone with
+  one click on the same square, not buried in a menu.
+- **The owner is always a caller, and can hand calling to other players** so they are not
+  tied to their phone for the whole raid. Granting does not pass on the power to grant —
+  only the owner does that. Everything else (title, items, closing) stays owner-only.
 - **An undo leaves no trace.** Any bingo that rested on the undone call is taken back with
   it, and disappears from the standings as if it never happened. A player who still holds
   a line some other way keeps theirs, with their original time. Re-calling restores it.
@@ -36,7 +39,9 @@ Concurrent games are supported. Each has its own title, items, owner, roster and
 
 Owner-only functions:
 
-- Call squares and undo calls.
+- Call squares and undo calls, and grant or revoke that for any other player. The player
+  is named by `char_name`, which resolves because names are unique within a game and is
+  the only identity the client ever sees.
 - Set the 24 items, editable **until the first non-owner joins**, then `items_json`
   freezes. (Non-owner: the owner takes a board through the same name gate as everyone
   else, so counting their own join would end editing before it started.)
@@ -198,16 +203,27 @@ Vitest dependency.
     players(pid, last_name_used, created_at, last_seen)
     sessions(token_hash, pid, created_at, expires_at)
     games(id, title, owner_pid, items_json, created_at, closed_at)
-    game_players(game_id, pid, char_name, board_json, joined_at, bingo_at)
+    game_players(game_id, pid, char_name, board_json, joined_at, bingo_at, can_call)
     calls(game_id, item_idx, called_at)        -- PK (game_id, item_idx)
 
 - `calls` holds one row per called item: a square is called iff the row exists, and undo is
   a plain delete.
 - `char_name` lives on `game_players`, not `players`, because people bring alts.
+- `can_call` is per game, not per player: being a caller on Tuesday says nothing about
+  Wednesday. The owner is a caller implicitly and carries no flag.
 - **Boards are stored, not derived.** Deal once, server-side, at join time, with
   `crypto.randomInt`, writing 24 item indices to `game_players.board_json`.
 - **Freeze `games.items_json` once the first non-owner joins.** Boards are indices into it.
 - **Never send another player's `pid` to the client.** The roster needs `char_name` only.
+
+## Migrations
+
+The live database holds real games, so `CREATE TABLE IF NOT EXISTS` is not enough on its
+own — a schema change has to reach rows that already exist. `db.ts` keeps a
+`SCHEMA_VERSION` and steps `PRAGMA user_version` forward, and every step is written to be
+safe to run twice. A test builds a database at the old shape, opens it, and asserts both
+that the column arrives and that existing rows do **not** silently gain the new
+permission.
 
 ## Security
 

@@ -38,6 +38,10 @@ export interface RosterEntry {
   bingoAt: number | null;
   /** True for the viewer's own row, so the client can highlight it. */
   you: boolean;
+  /** May call and undo. Always true for the owner. */
+  canCall: boolean;
+  /** The owner, who may also grant calling, edit the title and close. */
+  isOwner: boolean;
 }
 
 export interface GameView {
@@ -45,6 +49,8 @@ export interface GameView {
   title: string;
   closed: boolean;
   isOwner: boolean;
+  /** Whether the VIEWER may call and undo — owner, or granted by them. */
+  canCall: boolean;
   items: string[];
   itemsFrozen: boolean;
   /** null when the viewer has not joined yet. */
@@ -210,7 +216,7 @@ export class GameService {
 
     await this.#repo.addGamePlayer({
       gameId, pid, charName: normalizeCharName(name.value),
-      board: dealBoard(this.#rng), joinedAt: now, bingoAt: null,
+      board: dealBoard(this.#rng), joinedAt: now, bingoAt: null, canCall: false,
     });
     await this.#repo.setLastNameUsed(pid, normalizeCharName(name.value));
 
@@ -245,10 +251,43 @@ export class GameService {
     return fresh;
   }
 
+  /** The owner always may; anyone else needs the flag the owner sets. */
+  async #mayCall(gameId: string, ownerPid: string, pid: string): Promise<boolean> {
+    if (ownerPid === pid) return true;
+    const row = await this.#repo.getGamePlayer(gameId, pid);
+    return row?.canCall === true;
+  }
+
+  /**
+   * The owner hands calling to someone else — a second caller for the night,
+   * so they are not tied to their phone. Only the owner may grant it, and
+   * granting does not pass on the power to grant.
+   *
+   * The player is named by `charName` because that is the only identity the
+   * client ever sees; it resolves because names are unique within a game.
+   */
+  async setCaller(pid: string, gameId: string, charName: string, canCall: boolean): Promise<Result<string>> {
+    const game = await this.#liveGame(gameId);
+    if (game === null) return err("not_found", "That game doesn't exist.");
+    if (game.ownerPid !== pid) return err("forbidden", "Only the game's owner can hand out calling.");
+    if (game.closedAt !== null) return err("closed", "That game is closed.");
+
+    const target = await this.#repo.findByCharName(gameId, charName);
+    if (target === null) return err("not_found", `${charName} isn't in this game.`);
+    if (target.pid === game.ownerPid) {
+      return err("invalid", "You're the owner — you can always call.");
+    }
+
+    await this.#repo.setCanCall(gameId, target.pid, canCall);
+    return ok(target.charName);
+  }
+
   async call(pid: string, gameId: string, itemIndex: number): Promise<Result<{ winners: string[] }>> {
     const game = await this.#liveGame(gameId);
     if (game === null) return err("not_found", "That game doesn't exist.");
-    if (game.ownerPid !== pid) return err("forbidden", "You're not the caller for this game.");
+    if (!(await this.#mayCall(gameId, game.ownerPid, pid))) {
+      return err("forbidden", "You're not a caller for this game.");
+    }
     if (game.closedAt !== null) return err("closed", "That game is closed. No more calls.");
     if (!Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex >= ITEM_COUNT) {
       return err("invalid", "That square isn't on this board.");
@@ -261,7 +300,9 @@ export class GameService {
   async undo(pid: string, gameId: string, itemIndex: number): Promise<Result<null>> {
     const game = await this.#liveGame(gameId);
     if (game === null) return err("not_found", "That game doesn't exist.");
-    if (game.ownerPid !== pid) return err("forbidden", "You're not the caller for this game.");
+    if (!(await this.#mayCall(gameId, game.ownerPid, pid))) {
+      return err("forbidden", "You're not a caller for this game.");
+    }
     if (game.closedAt !== null) return err("closed", "That game is closed.");
     await this.#repo.removeCall(gameId, itemIndex);
     // An undo means it never happened, so any bingo that rested on this call
@@ -284,6 +325,7 @@ export class GameService {
       title: game.title,
       closed: game.closedAt !== null,
       isOwner: game.ownerPid === pid,
+      canCall: game.ownerPid === pid || mine?.canCall === true,
       items: game.items,
       itemsFrozen: game.itemsFrozen,
       board: mine?.board ?? null,
@@ -296,6 +338,8 @@ export class GameService {
           marks: markCount(r.board, called),
           bingoAt: r.bingoAt,
           you: r.pid === pid,
+          canCall: r.pid === game.ownerPid || r.canCall,
+          isOwner: r.pid === game.ownerPid,
         }))
         .sort((a, b) => {
           if ((a.bingoAt === null) !== (b.bingoAt === null)) return a.bingoAt === null ? 1 : -1;

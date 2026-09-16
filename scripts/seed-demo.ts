@@ -65,7 +65,7 @@ for (const [i, name] of RAIDERS.entries()) {
   await repo.upsertPlayer(pid, now);
   await repo.addGamePlayer({
     gameId, pid, charName: name,
-    board: dealBoard(cryptoRng), joinedAt: now + i, bingoAt: null,
+    board: dealBoard(cryptoRng), joinedAt: now + i, bingoAt: null, canCall: false,
   });
 }
 

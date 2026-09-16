@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS game_players (
   board_json    TEXT NOT NULL,
   joined_at     INTEGER NOT NULL,
   bingo_at      INTEGER,
+  can_call      INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (game_id, pid)
 ) STRICT;
 CREATE UNIQUE INDEX IF NOT EXISTS game_players_name
@@ -70,12 +71,35 @@ CREATE TABLE IF NOT EXISTS calls (
 ) STRICT;
 `;
 
+const SCHEMA_VERSION = 2;
+
+/**
+ * Schema changes have to reach databases that already hold real games, so
+ * CREATE TABLE IF NOT EXISTS is not enough on its own. Each step is written to
+ * be safe to run twice.
+ */
+function migrate(db: DatabaseSync): void {
+  const row = db.prepare("PRAGMA user_version").get() as { user_version?: number } | undefined;
+  const from = Number(row?.user_version ?? 0);
+  if (from >= SCHEMA_VERSION) return;
+
+  if (from < 2) {
+    const columns = db.prepare("PRAGMA table_info(game_players)").all() as { name?: unknown }[];
+    if (!columns.some((c) => String(c["name"]) === "can_call")) {
+      db.exec("ALTER TABLE game_players ADD COLUMN can_call INTEGER NOT NULL DEFAULT 0");
+    }
+  }
+
+  db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+}
+
 export function openDatabase(path: string): DatabaseSync {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
   db.exec("PRAGMA busy_timeout = 5000");
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }
 
@@ -109,6 +133,7 @@ const toGamePlayer = (r: Row): GamePlayerRow => ({
   board: JSON.parse(str(r["board_json"])) as number[],
   joinedAt: num(r["joined_at"]),
   bingoAt: maybeNum(r["bingo_at"]),
+  canCall: num(r["can_call"]) === 1,
 });
 
 export function createRepository(db: DatabaseSync): Repository {
@@ -147,6 +172,10 @@ export function createRepository(db: DatabaseSync): Repository {
     roster: db.prepare(`SELECT * FROM game_players WHERE game_id = ? ORDER BY joined_at ASC`),
     nameTaken: db.prepare(
       `SELECT 1 FROM game_players WHERE game_id = ? AND char_name_key = ? LIMIT 1`),
+    byName: db.prepare(
+      `SELECT * FROM game_players WHERE game_id = ? AND char_name_key = ?`),
+    setCanCall: db.prepare(
+      `UPDATE game_players SET can_call = ? WHERE game_id = ? AND pid = ?`),
     markBingo: db.prepare(
       `UPDATE game_players SET bingo_at = ? WHERE game_id = ? AND pid = ? AND bingo_at IS NULL`),
     clearBingo: db.prepare(
@@ -234,6 +263,13 @@ export function createRepository(db: DatabaseSync): Repository {
     },
     async isNameTaken(gameId, charName) {
       return q.nameTaken.get(gameId, charNameKey(charName)) !== undefined;
+    },
+    async findByCharName(gameId, charName) {
+      const r = q.byName.get(gameId, charNameKey(charName)) as Row | undefined;
+      return r ? toGamePlayer(r) : null;
+    },
+    async setCanCall(gameId, pid, canCall) {
+      q.setCanCall.run(canCall ? 1 : 0, gameId, pid);
     },
     async markBingo(gameId, pid, at) {
       q.markBingo.run(at, gameId, pid);

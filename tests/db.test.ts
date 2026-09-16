@@ -81,7 +81,7 @@ test("a player joins with a board and appears on the roster", async () => {
   const board = dealBoard(seededRng(1));
   await repo.addGamePlayer({
     gameId: "wyrm-lantern-ward", pid: "player", charName: "Thalgrim",
-    board, joinedAt: T0, bingoAt: null,
+    board, joinedAt: T0, bingoAt: null, canCall: false,
   });
   const row = await repo.getGamePlayer("wyrm-lantern-ward", "player");
   assert.deepEqual(row?.board, board, "the stored board must come back identical");
@@ -95,7 +95,7 @@ test("two players in one game cannot share a name, even case-shifted", async () 
   const join = (pid: string, charName: string) =>
     repo.addGamePlayer({
       gameId: "wyrm-lantern-ward", pid, charName,
-      board: dealBoard(seededRng(2)), joinedAt: T0, bingoAt: null,
+      board: dealBoard(seededRng(2)), joinedAt: T0, bingoAt: null, canCall: false,
     });
   await join("player", "Thalgrim");
   await repo.upsertPlayer("third", T0);
@@ -106,7 +106,7 @@ test("isNameTaken matches the same normalisation", async () => {
   const repo = await fixture();
   await repo.addGamePlayer({
     gameId: "wyrm-lantern-ward", pid: "player", charName: "Thalgrim",
-    board: dealBoard(seededRng(3)), joinedAt: T0, bingoAt: null,
+    board: dealBoard(seededRng(3)), joinedAt: T0, bingoAt: null, canCall: false,
   });
   assert.equal(await repo.isNameTaken("wyrm-lantern-ward", "THALGRIM"), true);
   assert.equal(await repo.isNameTaken("wyrm-lantern-ward", "Thal grim"), true);
@@ -123,7 +123,7 @@ test("the same name is free again in a different game", async () => {
   const join = (gameId: string) =>
     repo.addGamePlayer({
       gameId, pid: "player", charName: "Thalgrim",
-      board: dealBoard(seededRng(4)), joinedAt: T0, bingoAt: null,
+      board: dealBoard(seededRng(4)), joinedAt: T0, bingoAt: null, canCall: false,
     });
   await join("wyrm-lantern-ward");
   await join("frost-raven-keep");
@@ -154,7 +154,7 @@ test("bingo is stamped once, so the winner ranking cannot be rewritten", async (
   const repo = await fixture();
   await repo.addGamePlayer({
     gameId: "wyrm-lantern-ward", pid: "player", charName: "Thalgrim",
-    board: dealBoard(seededRng(5)), joinedAt: T0, bingoAt: null,
+    board: dealBoard(seededRng(5)), joinedAt: T0, bingoAt: null, canCall: false,
   });
   await repo.markBingo("wyrm-lantern-ward", "player", T0 + 60_000);
   await repo.markBingo("wyrm-lantern-ward", "player", T0 + 120_000);

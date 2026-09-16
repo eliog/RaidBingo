@@ -268,6 +268,22 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
     },
   );
 
+  app.post<{ Params: { id: string }; Body: { charName?: unknown; canCall?: unknown } }>(
+    "/api/games/:id/callers",
+    async (request, reply) => {
+      const pid = await requirePid(request, reply);
+      if (pid === null) return reply;
+      const { charName, canCall } = request.body ?? {};
+      if (typeof charName !== "string" || typeof canCall !== "boolean") {
+        return fail(reply, { code: "invalid", message: "A character name and a true/false are required." });
+      }
+      const r = await service.setCaller(pid, request.params.id, charName, canCall);
+      if (!r.ok) return fail(reply, r.error);
+      notifyGame(request.params.id);
+      return reply.send({ charName: r.value, canCall });
+    },
+  );
+
   app.post<{ Params: { id: string } }>("/api/games/:id/close", async (request, reply) => {
     const pid = await requirePid(request, reply);
     if (pid === null) return reply;

@@ -21,7 +21,7 @@ import { markCount } from "../shared/board.ts";
 export interface LivePayload {
   type: "state";
   called: [number, number][];
-  roster: { charName: string; marks: number; bingoAt: number | null }[];
+  roster: { charName: string; marks: number; bingoAt: number | null; canCall: boolean; isOwner: boolean }[];
   closed: boolean;
 }
 
@@ -94,7 +94,13 @@ export class GameHub {
       type: "state",
       called: [...calls.entries()].sort((a, b) => a[1] - b[1]),
       roster: roster
-        .map((r) => ({ charName: r.charName, marks: markCount(r.board, called), bingoAt: r.bingoAt }))
+        .map((r) => ({
+          charName: r.charName,
+          marks: markCount(r.board, called),
+          bingoAt: r.bingoAt,
+          canCall: r.pid === game.ownerPid || r.canCall,
+          isOwner: r.pid === game.ownerPid,
+        }))
         .sort((a, b) => {
           if ((a.bingoAt === null) !== (b.bingoAt === null)) return a.bingoAt === null ? 1 : -1;
           if (a.bingoAt !== null && b.bingoAt !== null) return a.bingoAt - b.bingoAt;

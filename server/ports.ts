@@ -43,6 +43,8 @@ export interface GamePlayerRow {
   board: number[];
   joinedAt: number;
   bingoAt: number | null;
+  /** Granted by the owner. The owner always may, without a row flag. */
+  canCall: boolean;
 }
 
 export interface SessionRow {
@@ -81,6 +83,9 @@ export interface Repository {
   rosterFor(gameId: string): Promise<GamePlayerRow[]>;
   /** Case-insensitive, whitespace-collapsed. `char_name` is the only visible identity. */
   isNameTaken(gameId: string, charName: string): Promise<boolean>;
+  /** Resolve a roster member by the only identity the client ever sees. */
+  findByCharName(gameId: string, charName: string): Promise<GamePlayerRow | null>;
+  setCanCall(gameId: string, pid: string, canCall: boolean): Promise<void>;
   markBingo(gameId: string, pid: string, at: number): Promise<void>;
   /** Undoing the call a line depended on takes the bingo back with it. */
   clearBingo(gameId: string, pid: string): Promise<void>;

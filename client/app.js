@@ -331,7 +331,8 @@ function renderCreate() {
 /* ---------------------------------------------------------------- board */
 function renderBoard() {
   let game = S.game;
-  const owner = game.isOwner;
+  const owner = game.isOwner;          // may grant calling, rename, close
+  let mayCall = game.canCall === true; // may call and undo — owner, or granted
   const board = game.board;
   let called = new Map(game.called);
   const pending = new Map();      // itemIndex -> timeout id
@@ -345,6 +346,7 @@ function renderBoard() {
   const tallyLine = h("span", { class: "n tabular" });
   const tallyRaid = h("span", { class: "n tabular" });
   const banner = h("div", { class: "banner", hidden: true });
+  const callbar = h("div", { class: "callbar", style: "margin-top:12px" });
   const rosterBody = h("div", { class: "body" });
   const logBody = h("div", { class: "body" });
   const filter = h("input", { type: "text", placeholder: "filter items…" });
@@ -400,6 +402,17 @@ function renderBoard() {
     });
     justCalled = null;
 
+    callbar.className = `callbar ${mayCall ? "owner" : ""}`;
+    callbar.textContent = mayCall
+      ? "⚑ Caller — tap a square when it happens. Tap it again to undo."
+      : (() => {
+          const callers = game.roster.filter((r) => r.canCall).map((r) => r.charName);
+          const who = callers.length === 0 ? "Nobody is"
+            : callers.length === 1 ? `${callers[0]} is`
+            : `${callers.slice(0, -1).join(", ")} and ${callers.at(-1)} are`;
+          return `${who} calling. Five in a row wins — tap any square to read it.`;
+        })();
+
     tallyCalled.textContent = `${calledSet.size}/${ITEM_COUNT}`;
     const best = Math.max(...[[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
       [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],[0,6,12,18,24],[4,8,12,16,20]]
@@ -425,10 +438,21 @@ function renderBoard() {
     clear(rosterBody);
     if (!game.roster.length) rosterBody.append(h("p", { class: "empty" }, "Nobody has joined yet."));
     for (const r of game.roster) {
+      const grant = owner && !r.isOwner && !game.closed
+        ? h("button", {
+            class: "btn quiet sm",
+            style: r.canCall ? "color:var(--fel)" : "",
+            title: r.canCall ? `Stop ${r.charName} calling` : `Let ${r.charName} call squares`,
+            onclick: () => setCaller(r.charName, !r.canCall),
+          }, r.canCall ? "⚑ caller" : "make caller")
+        : r.canCall
+          ? h("span", { class: "dim", title: r.isOwner ? "Owner" : "Caller" }, "⚑")
+          : null;
       rosterBody.append(h("div", { class: `lrow ${r.you ? "me" : ""}` },
         h("span", { class: "nm", text: r.charName }),
         r.bingoAt ? h("span", { class: "badge" }, "BINGO") : null,
-        h("span", { class: "dim tabular" }, `${r.marks}/25`)));
+        h("span", { class: "dim tabular" }, `${r.marks}/25`),
+        grant));
     }
 
     clear(logBody);
@@ -438,11 +462,18 @@ function renderBoard() {
       logBody.append(h("div", { class: "lrow" },
         h("span", { class: "nm", style: "white-space:normal", text: game.items[item] }),
         h("span", { class: "dim" }, clock(at)),
-        owner ? h("button", { class: "btn quiet sm", title: `Undo call: ${game.items[item]}`,
+        mayCall ? h("button", { class: "btn quiet sm", title: `Undo call: ${game.items[item]}`,
           onclick: () => send("undo", item) }, "↩") : null));
     }
 
     fit();
+  }
+
+  async function setCaller(charName, canCall) {
+    try {
+      await api(`/api/games/${game.id}/callers`, { charName, canCall });
+      toast(canCall ? `${charName} can call now.` : `${charName} can no longer call.`);
+    } catch (e) { toast(e.message, { kind: "warn" }); }
   }
 
   const ordinal = (n) => ["", "1st", "2nd", "3rd"][n] ?? `${n}th`;
@@ -450,19 +481,19 @@ function renderBoard() {
   /* ---- the sheet: how you read a square, and how the owner calls one ---- */
   function openSheet(item, isOn) {
     const desktop = window.innerWidth >= 700;
-    if (owner && desktop) { send(isOn ? "undo" : "call", item); return; }
+    if (mayCall && desktop) { send(isOn ? "undo" : "call", item); return; }
     const at = called.get(item);
     const scrim = h("div", { class: "sheet-scrim", onclick: close });
     const sheet = h("div", { class: "sheet", role: "dialog", "aria-modal": "true" },
       h("div", { class: "grab" }),
-      h("p", { class: "eyebrow", style: owner ? "color:var(--fel)" : "" },
-        owner && !isOn ? "Call this square" : isOn ? `Called at ${clock(at)}` : "Not called yet"),
+      h("p", { class: "eyebrow", style: mayCall ? "color:var(--fel)" : "" },
+        mayCall && !isOn ? "Call this square" : isOn ? `Called at ${clock(at)}` : "Not called yet"),
       h("p", { class: "phrase", text: game.items[item] }),
-      owner ? h("p", { class: "dim", style: "margin-bottom:14px" },
+      mayCall ? h("p", { class: "dim", style: "margin-bottom:14px" },
         isOn ? `Unticks on all ${game.roster.length} boards.` : `Ticks on all ${game.roster.length} boards at once.`) : null,
-      owner ? h("button", { class: `btn block ${isOn ? "" : "pri"}`, style: "min-height:52px" + (isOn ? ";border-color:var(--fel);color:var(--fel)" : ""),
+      mayCall ? h("button", { class: `btn block ${isOn ? "" : "pri"}`, style: "min-height:52px" + (isOn ? ";border-color:var(--fel);color:var(--fel)" : ""),
         onclick: () => { close(); send(isOn ? "undo" : "call", item); } }, isOn ? "UNDO CALL" : "CALL IT") : null,
-      h("button", { class: "btn quiet block", onclick: close }, owner ? "Cancel" : "Close"));
+      h("button", { class: "btn quiet block", onclick: close }, mayCall ? "Cancel" : "Close"));
     function close() { scrim.remove(); sheet.remove(); document.removeEventListener("keydown", esc); }
     function esc(e) { if (e.key === "Escape") close(); }
     document.addEventListener("keydown", esc);
@@ -503,6 +534,7 @@ function renderBoard() {
   function apply(next) {
     game = { ...game, ...next, board };
     called = new Map(next.called);
+    if (typeof next.canCall === "boolean") mayCall = next.canCall;
     draw();
   }
 
@@ -529,6 +561,9 @@ function renderBoard() {
       called = new Map(msg.called);
       game = { ...game, closed: msg.closed,
         roster: msg.roster.map((r) => ({ ...r, you: r.charName === game.charName })) };
+      // The owner can grant or revoke mid-raid; the board has to become
+      // usable, or stop being usable, without a reload.
+      mayCall = owner || game.roster.some((r) => r.you && r.canCall);
       draw();
     });
     socket.addEventListener("close", () => {
@@ -573,9 +608,7 @@ function renderBoard() {
         if (!confirm("Close this game? No more squares can be called.")) return;
         await api(`/api/games/${game.id}/close`); location.reload();
       } }, "Close game") : null),
-    h("div", { class: `callbar ${owner ? "owner" : ""}`, style: "margin-top:12px" },
-      owner ? "⚑ Caller — tap a square when it happens. Tap it again to undo."
-            : "Five in a row wins. Tap any square to read it."),
+    callbar,
     h("div", { class: "layout" },
       h("section", null, well,
         h("div", { class: "legend" },
