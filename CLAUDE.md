@@ -55,6 +55,11 @@ When creating a game, show the owner the item sets from their own previous games
 can prefill and edit. No schema needed — `games.items_json` keyed by `owner_pid` is the
 library.
 
+Alongside those, `presets.json` at the project root supplies fixed starting sets. It is
+**not committed**: a guild's squares name real people and this repo is public. A missing
+or malformed file is never fatal — bad entries are skipped with a warning and the screen
+offers fewer starting points.
+
 ### Game IDs
 
 Three distinct words from a curated pool of ~512 WoW words, e.g.

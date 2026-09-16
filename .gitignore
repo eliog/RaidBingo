@@ -23,3 +23,6 @@ dist/
 fonts/*.ttf
 fonts/*.otf
 fonts/OFL-*.txt
+
+# guild squares name real people; keep them out of a public repo
+presets.json

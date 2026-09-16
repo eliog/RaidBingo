@@ -7,6 +7,7 @@ import { layout, errorPage } from "./html.ts";
 import { isWellFormedId } from "../shared/ids.ts";
 import { ITEM_COUNT, FREE_CELL } from "../shared/board.ts";
 import { ogPng, ogTags, type OgState } from "./og.ts";
+import { loadPresets } from "./presets.ts";
 
 const STATUS: Record<ServiceError["code"], number> = {
   not_found: 404,
@@ -111,6 +112,7 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
         view: "create",
         lastName: player?.lastNameUsed ?? null,
         itemCount: ITEM_COUNT,
+        presets: await loadPresets(),
         previous: await service.previousItemSets(pid),
       }),
     );

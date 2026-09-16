@@ -279,6 +279,13 @@ function renderCreate() {
     window.scrollTo({ top: document.body.scrollHeight * 0.4, behavior: "smooth" });
   };
 
+  const startCard = ({ title, meta, items, preset }) =>
+    h("div", { class: "card", style: preset ? "border-color:var(--gold)" : "" },
+      h("span", { style: "font-family:Cinzel,Georgia,serif;font-weight:700;font-size:14px", text: title }),
+      h("span", { class: "dim", style: preset ? "color:var(--gold)" : "", text: meta }),
+      h("span", { class: "sample", text: items.slice(0, 2).map((t) => `“${t}”`).join(", ") + "…" }),
+      h("button", { class: `btn sm ${preset ? "pri" : ""}`, onclick: () => useSet(items) }, "Use it"));
+
   const tabs = h("div", { class: "tabs", style: "max-width:320px;margin:0" },
     h("button", { "aria-selected": "true", onclick: (e) => switchMode(e, false) }, "Type one by one"),
     h("button", { "aria-selected": "false", onclick: (e) => switchMode(e, true) }, "Paste a list"));
@@ -304,15 +311,20 @@ function renderCreate() {
       h("p", { class: "eyebrow" }, "Title"),
       h("div", { style: "max-width:420px" }, title),
       h("p", { class: "dim" }, "Seen in the lobby and in Discord. 40 characters.")),
-    S.previous.length
+    (S.presets ?? []).length || S.previous.length
       ? h("section", { class: "stack" },
           h("p", { class: "eyebrow" }, "Start from"),
-          h("div", { class: "cards" }, S.previous.map((p) =>
-            h("div", { class: "card" },
-              h("span", { style: "font-family:Cinzel,Georgia,serif;font-weight:700;font-size:14px", text: p.title }),
-              h("span", { class: "dim", text: `${day(p.createdAt)} · ${p.items.length}` }),
-              h("span", { class: "sample", text: p.items.slice(0, 2).map((t) => `“${t}”`).join(", ") + "…" }),
-              h("button", { class: "btn sm", onclick: () => useSet(p.items) }, "Use it")))))
+          h("div", { class: "cards" }, [
+            // Presets first: they are the stable starting points.
+            ...(S.presets ?? []).map((p) => startCard({
+              title: p.name, meta: `preset · ${p.items.length} squares`,
+              items: p.items, preset: true,
+            })),
+            ...S.previous.map((p) => startCard({
+              title: p.title, meta: `${day(p.createdAt)} · ${p.items.length}`,
+              items: p.items, preset: false,
+            })),
+          ]))
       : null,
     h("section", { class: "stack" },
       h("div", { class: "row" },

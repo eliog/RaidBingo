@@ -57,6 +57,22 @@ Fonts do not travel inside an SVG, so drop `Cinzel-Bold.ttf`, `AlegreyaSans-Bold
 a monospace face (JetBrains Mono or IBM Plex Mono, both OFL) into `fonts/`, with their
 licence files. Without them the image still renders, in whatever the host happens to have.
 
+## Preset squares
+
+The create screen offers starting points under **Start from**: your own previous games,
+plus any presets you configure. Presets live in `presets.json` at the project root:
+
+```json
+[{ "name": "DEA Defaults", "items": ["Someone pulls before the count", "..."] }]
+```
+
+Each needs a name and exactly 24 squares. Copy `presets.example.json` to get going.
+
+**`presets.json` is deliberately not committed.** A guild's squares name real people, and
+this repo is public — your in-jokes should not become someone else's git history. A
+missing or malformed file is not fatal: the create screen simply offers fewer starting
+points, and anything skipped is logged.
+
 ## Privacy
 
 The only thing kept about a Discord account is a one-way fingerprint:
