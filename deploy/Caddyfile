@@ -20,12 +20,16 @@ raidbingo.com {
 	}
 
 	encode zstd gzip
-	log {
-		output file /var/log/caddy/raidbingo.log
-	}
+	# Logs go to journald (Caddy's default) — read them with
+	# `journalctl -u caddy`. Deliberately not a file: on Ubuntu the packaged
+	# unit cannot write to /var/log/caddy even when the directory is owned by
+	# the caddy user, and the service fails to start with a permission error
+	# that is nowhere near obvious.
 }
 
-# Optional: send www to the bare domain.
+# Uncomment if www also resolves to this machine. Without it, visitors to
+# www get a certificate error rather than a redirect, because Caddy only
+# issues certificates for names it is configured to serve.
 # www.raidbingo.com {
 # 	redir https://raidbingo.com{uri} permanent
 # }
