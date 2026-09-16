@@ -428,7 +428,9 @@ function renderBoard() {
     justCalled = null;
 
     callbar.className = `callbar ${mayCall ? "owner" : ""}`;
-    callbar.textContent = mayCall
+    callbar.textContent = game.closed
+      ? "This game is finished \u2014 you're looking at how it ended."
+      : mayCall
       ? "⚑ Caller — tap a square when it happens. Tap it again to undo."
       : (() => {
           const callers = game.roster.filter((r) => r.canCall).map((r) => r.charName);
@@ -648,7 +650,7 @@ function renderBoard() {
         roster: msg.roster.map((r) => ({ ...r, you: r.charName === game.charName })) };
       // The owner can grant or revoke mid-raid; the board has to become
       // usable, or stop being usable, without a reload.
-      mayCall = owner || game.roster.some((r) => r.you && r.canCall);
+      mayCall = !game.closed && (owner || game.roster.some((r) => r.you && r.canCall));
       draw();
     });
     socket.addEventListener("close", () => {

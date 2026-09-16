@@ -338,6 +338,12 @@ test("a finished game is still fully readable a year later", async () => {
 
   h.clock.advance(365 * 24 * 60 * 60 * 1000);
 
+  // Nobody calls in a finished game, the owner included.
+  const asOwner = await h.service.view(OWNER, h.gameId);
+  assert.ok(asOwner.ok);
+  assert.equal(asOwner.value.isOwner, true);
+  assert.equal(asOwner.value.canCall, false, "a closed game must not offer a call button");
+
   const later = await h.service.view(ALICE, h.gameId);
   assert.ok(later.ok, "a closed game must still be readable");
   assert.equal(later.value.closed, true);

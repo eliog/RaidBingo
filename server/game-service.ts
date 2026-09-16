@@ -337,7 +337,9 @@ export class GameService {
       title: game.title,
       closed: game.closedAt !== null,
       isOwner: game.ownerPid === pid,
-      canCall: game.ownerPid === pid || mine?.canCall === true,
+      // A closed game is history. Nobody calls in it, the owner included —
+      // the server would refuse anyway, so do not offer the button.
+      canCall: game.closedAt === null && (game.ownerPid === pid || mine?.canCall === true),
       items: game.items,
       itemsFrozen: game.itemsFrozen,
       board: mine?.board ?? null,
