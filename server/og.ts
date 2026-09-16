@@ -76,6 +76,10 @@ export function ogSvg(state: OgState): string {
 <g fill="none" stroke="${G}" stroke-width="2" opacity=".45">${cells.map((c) => `<path d="${tile(c.x, c.y)}"/>`).join("")}</g>
 ${cells.filter((c) => c.i !== FREE_CELL && called.has(c.i)).map((c) => `<path d="${bar(c.x, c.y)}" fill="${FEL}"/>`).join("")}
 <path d="M${fx + CH} ${fy + 4.5}H${fx + T}" stroke="${FEL}" stroke-width="9" stroke-linecap="butt" stroke-dasharray="7 6"/>
+<g transform="translate(${fx + 11},${fy + 13}) scale(2)">
+  <path d="M6.2 9.2 12 3.6l5.8 5.6v6.6L12 21.4l-5.8-6V9.2Z" fill="none" stroke="${FEL}" stroke-width="1.3"/>
+  <path d="M12 8.4c1.9 1.8 2.9 3.2 2.9 4.5a2.9 2.9 0 0 1-5.8 0c0-1.3 1-2.7 2.9-4.5Z" fill="${FEL}"/>
+</g>
 <g transform="translate(68,52) scale(.72)">${MARK}</g>
 <text x="128" y="82" font-family="Cinzel" font-weight="700" font-size="25" letter-spacing="4.5" fill="${BONE}">RAID BINGO</text>
 <path d="M68 128h560" stroke="${G}" stroke-width="1" opacity=".3"/>

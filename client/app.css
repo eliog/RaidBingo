@@ -141,7 +141,11 @@ textarea{min-height:160px;resize:vertical;line-height:1.5}
 .cell.win{background:var(--fel);color:var(--fel-ink);border-color:var(--fel);font-weight:700}
 .cell.win::after{background:var(--fel-ink)}
 .cell.win .t{text-decoration:line-through;text-decoration-color:var(--fel-ink)}
-.cell.free{background:var(--sunk);border-color:var(--line-strong);color:var(--fel);font-family:Cinzel,Georgia,serif;font-weight:700;font-size:10px;letter-spacing:.09em;cursor:default}
+.cell.free{background:var(--sunk);border-color:var(--line-strong);color:var(--fel);cursor:default;
+  flex-direction:column;gap:3px;font-family:Cinzel,Georgia,serif;font-weight:700;letter-spacing:.09em}
+.cell.free .hearth{width:clamp(18px,42%,30px);height:auto;flex:none}
+.cell.free .hearth-label{font-size:clamp(7.5px,1.5vw,9.5px);text-transform:uppercase;line-height:1}
+@media (max-width:420px){ .cell.free .hearth-label{display:none} }
 .cell.free::after{background:repeating-linear-gradient(90deg,var(--fel) 0 3px,transparent 3px 6px)}
 .cell.pending{opacity:.7}
 .cell.pending::before{content:"";position:absolute;inset:-1px;border:1px solid var(--gold);border-radius:2px;animation:pulse 1.5s ease-in-out infinite}

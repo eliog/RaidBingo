@@ -12,7 +12,11 @@ numbers, no content tables. The app never talks to the game client.
 
 ## Game
 
-- 5x5 board: 24 items plus a free centre square.
+- 5x5 board: 24 items plus a free centre square, the **Hearthstone** — always marked,
+  drawn as an original chamfered stone with an ember. The name is a Blizzard trademark, so
+  the glyph is deliberately our own geometry in the existing fel/chamfer vocabulary, never
+  traced from or evocative of their item art. That rule holds for every mark in this
+  project.
 - Every player gets the **same 24 items in a different order**.
 - **Callers call squares.** A call ticks on every board at once, and can be undone with
   one click on the same square, not buried in a menu.

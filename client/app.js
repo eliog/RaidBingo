@@ -400,7 +400,19 @@ function renderBoard() {
 
     board.forEach((item, pos) => {
       if (pos === FREE_CELL) {
-        grid.append(h("div", { class: "cell free" + (wins.has(pos) ? " win" : "") }, "Callstone"));
+        const stone = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        stone.setAttribute("viewBox", "0 0 24 24");
+        stone.setAttribute("aria-hidden", "true");
+        stone.setAttribute("class", "hearth");
+        // Original geometry: a chamfered stone with an ember, in the same
+        // vocabulary as the rest of the marks.
+        stone.innerHTML =
+          '<path d="M6.2 9.2 12 3.6l5.8 5.6v6.6L12 21.4l-5.8-6V9.2Z" fill="none" stroke="currentColor" stroke-width="1.5"/>' +
+          '<path d="M12 8.4c1.9 1.8 2.9 3.2 2.9 4.5a2.9 2.9 0 0 1-5.8 0c0-1.3 1-2.7 2.9-4.5Z" fill="currentColor"/>';
+        grid.append(h("div", {
+          class: "cell free" + (wins.has(pos) ? " win" : ""),
+          title: "Hearthstone \u2014 the free square, always yours",
+        }, stone, h("span", { class: "hearth-label" }, "Hearthstone")));
         return;
       }
       const on = calledSet.has(item);

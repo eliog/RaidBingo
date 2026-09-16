@@ -10,7 +10,7 @@ import type { Rng } from "./seams.ts";
 export const BOARD_CELLS = 25;
 /** Items a game carries. The 25th cell is free. */
 export const ITEM_COUNT = 24;
-/** Position of the free centre square — "the Callstone". */
+/** Position of the free centre square — the Hearthstone. Always marked. */
 export const FREE_CELL = 12;
 /** Value stored at the free cell instead of an item index. */
 export const FREE = -1;
