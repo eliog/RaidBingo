@@ -148,3 +148,26 @@ export async function ogPng(state: OgState): Promise<Buffer> {
   });
   return Buffer.from(resvg.render().asPng());
 }
+
+/**
+ * Rendering is synchronous native work on the only thread (~150 ms), and the
+ * route is public, so an uncached render per request let anyone holding one
+ * posted game id stall every live board. The image is a pure function of its
+ * state, so cache on exactly that: it renders at most once per change.
+ * Concurrent misses share one render, and a failed render is not kept.
+ */
+export function ogCache(render: (state: OgState) => Promise<Buffer> = ogPng, max = 256) {
+  const entries = new Map<string, Promise<Buffer>>();
+  return (state: OgState): Promise<Buffer> => {
+    const key = JSON.stringify([state.id, state.title, state.players, state.calls, state.bingos, state.calledCells]);
+    let png = entries.get(key);
+    if (png === undefined) {
+      png = render(state);
+      png.catch(() => entries.delete(key));
+      // Map iterates in insertion order, so the first key is the oldest.
+      if (entries.size >= max) entries.delete(entries.keys().next().value as string);
+      entries.set(key, png);
+    }
+    return png;
+  };
+}

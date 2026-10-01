@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ogSvg, ogTags, ogPng } from "../server/og.ts";
+import { ogSvg, ogTags, ogPng, ogCache } from "../server/og.ts";
 
 const fresh = { id: "wyrm-lantern-ward", title: "Tuesday BT run", players: 0, calls: 0, bingos: 0, calledCells: [] };
 const live = { ...fresh, players: 18, calls: 19, bingos: 2, calledCells: [0, 1, 6, 7, 13] };
@@ -63,4 +63,29 @@ test("it rasterises to a real png, because Discord will not render svg", async (
   const png = await ogPng(fresh);
   assert.ok(png.length > 2000, `only ${png.length} bytes`);
   assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+});
+
+test("the preview renders once per state, not once per request (#5)", async () => {
+  let renders = 0;
+  const png = ogCache(async () => { renders++; return Buffer.from([renders]); });
+  await Promise.all([png(live), png(live), png({ ...live })]);
+  await png(live);
+  assert.equal(renders, 1, "unchanged state, concurrent or not, renders once");
+
+  await png({ ...live, calls: 20, calledCells: [...live.calledCells, 8] });
+  assert.equal(renders, 2, "a call changes the image");
+});
+
+test("a failed render is not cached, and the cache stays bounded", async () => {
+  let renders = 0;
+  const flaky = ogCache(async () => { if (++renders === 1) throw new Error("boom"); return Buffer.alloc(1); });
+  await assert.rejects(flaky(live));
+  await flaky(live);
+  assert.equal(renders, 2);
+
+  let count = 0;
+  const small = ogCache(async () => { count++; return Buffer.alloc(1); }, 2);
+  for (const calls of [1, 2, 3]) await small({ ...live, calls });
+  await small({ ...live, calls: 1 });
+  assert.equal(count, 4, "the oldest entry was evicted");
 });

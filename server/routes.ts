@@ -6,7 +6,7 @@ import { RateLimiter } from "./rate-limit.ts";
 import { layout, errorPage } from "./html.ts";
 import { isWellFormedId } from "../shared/ids.ts";
 import { ITEM_COUNT, FREE_CELL } from "../shared/board.ts";
-import { ogPng, ogTags, type OgState } from "./og.ts";
+import { ogCache, ogTags, type OgState } from "./og.ts";
 import { loadPresets } from "./presets.ts";
 import { isTheme, type Theme } from "../shared/validate.ts";
 
@@ -71,6 +71,7 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
   // Join-by-id is the only place an id can be guessed at, so it is the only
   // thing that needs a limiter.
   const joinLimiter = new RateLimiter(deps.clock, 10, 60_000);
+  const ogPng = ogCache();
 
   /**
    * Defence in depth against CSRF. SameSite=Lax already stops the session
