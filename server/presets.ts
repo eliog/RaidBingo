@@ -18,6 +18,8 @@ export interface Preset {
 }
 
 let cached: Preset[] | null = null;
+const DEFAULT_FILE = path.resolve(import.meta.dirname, "..", "presets.json");
+let file = DEFAULT_FILE;
 
 function usable(entry: unknown, problems: string[]): Preset | null {
   if (typeof entry !== "object" || entry === null) return null;
@@ -42,7 +44,6 @@ function usable(entry: unknown, problems: string[]): Preset | null {
 export async function loadPresets(): Promise<Preset[]> {
   if (cached !== null) return cached;
 
-  const file = path.resolve(import.meta.dirname, "..", "presets.json");
   let raw: string;
   try {
     raw = await readFile(file, "utf8");
@@ -76,5 +77,14 @@ export async function loadPresets(): Promise<Preset[]> {
 
 /** Tests only. */
 export function clearPresetCache(): void {
+  cached = null;
+}
+
+/**
+ * Tests only: read presets from somewhere else. The tests write and delete
+ * their file, and pointed at the real presets.json they deleted the guild's.
+ */
+export function usePresetFile(next: string | null): void {
+  file = next ?? DEFAULT_FILE;
   cached = null;
 }

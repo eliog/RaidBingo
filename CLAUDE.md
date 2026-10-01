@@ -88,7 +88,9 @@ Alongside those, `presets.json` at the project root supplies fixed starting sets
 **not committed**: a guild's squares name real people and this repo is public. On Fly it lives
 on the volume (`/app/presets.json` is a symlink to `/data/presets.json`). A missing
 or malformed file is never fatal — bad entries are skipped with a warning and the screen
-offers fewer starting points.
+offers fewer starting points. **Presets are readable by anyone who can log in** (any
+Discord account; there is no guild binding) — a deliberate choice, pinned by a test, and
+said plainly in the README. Changing who sees them is a decision, not a fix.
 
 ### Game IDs
 

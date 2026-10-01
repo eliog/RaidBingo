@@ -84,7 +84,12 @@ plus any presets you configure. Presets live in `presets.json` at the project ro
 Each needs a name and exactly 24 squares. Copy `presets.example.json` to get going.
 
 **`presets.json` is deliberately not committed.** A guild's squares name real people, and
-this repo is public — your in-jokes should not become someone else's git history. A
+this repo is public — your in-jokes should not become someone else's git history.
+
+**Not committed is not the same as private.** Every preset is sent to anyone who logs in
+and opens *New game*, and anyone with a Discord account can log in — there is no guild
+check. Treat presets as visible to anyone who has your site's address, and keep anything
+you would not want a stranger to read out of them. A
 missing or malformed file is not fatal: the create screen simply offers fewer starting
 points, and anything skipped is logged.
 

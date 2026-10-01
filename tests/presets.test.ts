@@ -2,10 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { writeFile, rm } from "node:fs/promises";
 import path from "node:path";
-import { loadPresets, clearPresetCache } from "../server/presets.ts";
+import { tmpdir } from "node:os";
+import { loadPresets, clearPresetCache, usePresetFile } from "../server/presets.ts";
 import { ITEM_COUNT } from "../shared/board.ts";
 
-const FILE = path.resolve(import.meta.dirname, "..", "presets.json");
+// Never the real presets.json: these tests write and delete their file.
+const FILE = path.join(tmpdir(), `rb-presets-${process.pid}.json`);
+const REAL = path.resolve(import.meta.dirname, "..", "presets.json");
+usePresetFile(FILE);
 const items = (n = ITEM_COUNT) => Array.from({ length: n }, (_, i) => `square ${i + 1}`);
 
 async function withFile(contents: string | null, run: () => Promise<void>) {
@@ -54,5 +58,12 @@ test("a preset with duplicate squares is skipped", async () => {
 test("a nameless preset is skipped", async () => {
   await withFile(JSON.stringify([{ name: "  ", items: items() }]), async () => {
     assert.deepEqual(await loadPresets(), []);
+  });
+});
+
+test("the tests never touch the real presets.json", async () => {
+  assert.notEqual(FILE, REAL);
+  await withFile(JSON.stringify([{ name: "x", items: items() }]), async () => {
+    assert.equal((await loadPresets()).length, 1, "reads the temp file");
   });
 });

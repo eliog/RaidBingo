@@ -8,6 +8,10 @@ import { testConfig, fakeDiscord, items, T0 } from "./helpers.ts";
 import { SESSION_COOKIE, OAUTH_COOKIE } from "../server/auth.ts";
 import { LOOKUP_MISSES, LOOKUP_WINDOW_MS } from "../server/routes.ts";
 import { apiRequest } from "../shared/request.ts";
+import { usePresetFile } from "../server/presets.ts";
+import { writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 function app(discordUserId = "1099") {
   const repo = createRepository(openDatabase(":memory:"));
@@ -631,4 +635,22 @@ test("an unexpected 500 never shows the internal error, and 4xx keep theirs (#17
     payload: "{not json" });
   assert.equal(big.statusCode, 400);
   assert.ok(big.body.length > 0 && !big.body.includes("Something went wrong on our side"));
+});
+
+test("presets go to anyone who logs in — deliberately, see README (#18)", async () => {
+  // If this fails because presets became gated, that was a decision: update
+  // the README and CLAUDE.md, which tell owners presets are effectively public.
+  const file = path.join(tmpdir(), `rb-presets-app-${process.pid}.json`);
+  await writeFile(file, JSON.stringify([{ name: "Raid night", items: items() }]), "utf8");
+  usePresetFile(file);
+  try {
+    const h = app();
+    const stranger = await signIn(h, "9999");          // has never played anything
+    const res = await h.instance.inject({ method: "GET", url: "/new", headers: { cookie: stranger } });
+    assert.equal(res.statusCode, 200);
+    assert.ok(res.body.includes('"name":"Raid night"'));
+  } finally {
+    usePresetFile(null);
+    await rm(file, { force: true });
+  }
 });
