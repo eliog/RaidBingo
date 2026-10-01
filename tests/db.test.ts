@@ -262,3 +262,25 @@ test("the idle clock only moves forward (#13)", async () => {
   await repo.touchGame("a-b-c", T0 + 100);
   assert.equal((await repo.getGame("a-b-c"))?.lastActivityAt, T0 + 500);
 });
+
+test("expired sessions are deleted, live ones kept, at exactly the boundary findSession uses (#22)", async () => {
+  const repo = createRepository(openDatabase(":memory:"));
+  await repo.upsertPlayer("p", T0);
+  await repo.upsertPlayer("q", T0);
+  const add = (hash: string, pid: string, expiresAt: number) =>
+    repo.createSession({ tokenHash: hash, pid, createdAt: T0, expiresAt });
+  await add("long-gone", "p", T0 - 1);
+  await add("expires-now", "p", T0);           // findSession already treats this as expired
+  await add("one-ms-left", "q", T0 + 1);
+  await add("fresh", "q", T0 + 90 * 24 * 3600 * 1000);
+
+  assert.equal(await repo.deleteExpiredSessions(T0), 2);
+  for (const hash of ["long-gone", "expires-now"]) {
+    assert.equal(await repo.findSession(hash, T0 - 10_000), null, `${hash} should be gone, not merely expired`);
+  }
+  for (const hash of ["one-ms-left", "fresh"]) assert.notEqual(await repo.findSession(hash, T0), null, hash);
+
+  // Repeating it is harmless, and players are never touched.
+  assert.equal(await repo.deleteExpiredSessions(T0), 0);
+  assert.notEqual(await repo.getPlayer("p"), null);
+});

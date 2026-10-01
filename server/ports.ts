@@ -89,6 +89,8 @@ export interface Repository {
   createSession(row: SessionRow): Promise<void>;
   findSession(tokenHash: string, now: number): Promise<SessionRow | null>;
   deleteSession(tokenHash: string): Promise<void>;
+  /** Deletes every session with expires_at <= now; returns how many. */
+  deleteExpiredSessions(now: number): Promise<number>;
 
   /** A new game has issued no chat `seq` yet, so `chatSeq` is not the caller's to set. */
   createGame(row: Omit<GameRow, "chatSeq" | "lastActivityAt">): Promise<void>;

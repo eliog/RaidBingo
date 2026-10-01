@@ -224,6 +224,8 @@ export function createRepository(db: DatabaseSync): Repository {
       `INSERT INTO sessions (token_hash, pid, created_at, expires_at) VALUES (?, ?, ?, ?)`),
     findSession: db.prepare(`SELECT * FROM sessions WHERE token_hash = ? AND expires_at > ?`),
     deleteSession: db.prepare(`DELETE FROM sessions WHERE token_hash = ?`),
+    // <= because findSession treats expires_at = now as already expired.
+    deleteExpiredSessions: db.prepare(`DELETE FROM sessions WHERE expires_at <= ?`),
 
     createGame: db.prepare(
       `INSERT INTO games (id, title, owner_pid, items_json, items_frozen, created_at, closed_at, last_activity_at)
@@ -313,6 +315,9 @@ export function createRepository(db: DatabaseSync): Repository {
     },
     async deleteSession(tokenHash) {
       q.deleteSession.run(tokenHash);
+    },
+    async deleteExpiredSessions(now) {
+      return Number(q.deleteExpiredSessions.run(now).changes);
     },
 
     async createGame(row) {

@@ -8,6 +8,7 @@ import { openDatabase, createRepository } from "./db.ts";
 import { createDiscordPort } from "./discord.ts";
 import { buildApp, setHub } from "./app.ts";
 import { GameHub } from "./ws.ts";
+import { runMaintenance, MAINTENANCE_EVERY_MS } from "./maintenance.ts";
 import { systemClock, cryptoRng } from "../shared/seams.ts";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -46,10 +47,17 @@ await app.listen({ port: config.port, host: "0.0.0.0" });
 hub.attach(app.server);
 console.log(`raid bingo listening on ${config.baseUrl} (port ${config.port})`);
 
+// Never fatal: a failed sweep is retried on the next tick.
+const maintain = () => { runMaintenance(deps).catch((e) => console.error(`maintenance failed: ${(e as Error).message}`)); };
+maintain();
+const maintenance = setInterval(maintain, MAINTENANCE_EVERY_MS);
+maintenance.unref();
+
 // A deploy drops every socket mid-raid. Saying goodbye first lets clients use
 // calmer copy and a fast backoff instead of the cold-drop one.
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
+    clearInterval(maintenance);
     hub.goodbye("restart");
     // A beat for the goodbye to flush before the sockets are torn down.
     setTimeout(() => {
