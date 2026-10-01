@@ -9,6 +9,8 @@ import { ITEM_COUNT, FREE_CELL } from "../shared/board.ts";
 import { ogCache, ogTags, type OgState } from "./og.ts";
 import { loadPresets } from "./presets.ts";
 import { isTheme, type Theme } from "../shared/validate.ts";
+import { appVersion } from "./version.ts";
+import path from "node:path";
 
 /** Unknown game ids one client may ask about per window, across every route. */
 export const LOOKUP_MISSES = 20;
@@ -74,7 +76,11 @@ async function ogState(deps: Deps, id: string): Promise<OgState | null> {
   };
 }
 
+/** The running build's short commit hash, read once at startup (#32). */
+const VERSION = appVersion(path.resolve(import.meta.dirname, ".."));
+
 function page(title: string, state: { theme?: Theme; [key: string]: unknown }, head?: string): string {
+  state = { ...state, version: VERSION };
   // layout() escapes; escaping here too would double-encode an & in a title.
   const full = title === "Raid Bingo" ? title : `${title} — Raid Bingo`;
   return layout({

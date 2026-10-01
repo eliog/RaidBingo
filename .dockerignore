@@ -6,3 +6,8 @@
 !shared/
 !server/
 !client/
+# Just enough git to name the running commit (#32): HEAD and the refs. No
+# objects, no history, no config.
+!.git/HEAD
+!.git/refs/heads/
+!.git/packed-refs

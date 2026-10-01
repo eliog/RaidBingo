@@ -258,3 +258,11 @@ textarea{min-height:160px;resize:vertical;line-height:1.5}
 .chat .older{display:block;margin:2px auto 6px}
 .composer{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
 .composer input{flex:1;min-width:0}
+
+/* footer (#32): quiet, in the flow, never over the board */
+.site-foot{max-width:720px;margin:8px auto 0;padding:18px 16px calc(28px + env(safe-area-inset-bottom,0));border-top:1px solid var(--line);text-align:center;display:flex;flex-direction:column;gap:6px}
+.site-foot .quip{font-style:italic;color:var(--ink-dim);font-size:13.5px;line-height:1.45;min-height:2.9em;transition:opacity .4s ease}
+.site-foot .quip.fading{opacity:0}
+.site-foot .fine{color:var(--ink-faint);font-size:11.5px;letter-spacing:.02em}
+.site-foot .fine .mono{font-size:11.5px;word-break:normal}
+@media (prefers-reduced-motion:reduce){.site-foot .quip{transition:none}}

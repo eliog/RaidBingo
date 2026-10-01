@@ -34,6 +34,14 @@ COPY shared shared
 COPY server server
 COPY client client
 
+# The running commit, for the footer (#32). The wildcard lets the build work
+# with no .git at all; only HEAD and the refs are in the context (see
+# .dockerignore), and an unresolvable one just shows "dev". The hash is echoed
+# so the build log says which commit it built.
+COPY package.json .gi[t] /tmp/gitmeta/
+RUN node server/version.ts --write /tmp/gitmeta > version.txt 2>/dev/null; \
+    rm -rf /tmp/gitmeta; echo "version: $(cat version.txt)"
+
 # presets.json names real guild members, so it is never baked into an image.
 # It lives on the volume and a missing file is not fatal.
 RUN ln -s /data/presets.json presets.json && chmod 644 fonts/*

@@ -18,7 +18,7 @@ const CLIENT_DIR = path.resolve(import.meta.dirname, "..", "client");
 const cache = new Map<string, string>();
 
 /** Only these may be requested, so a path cannot walk out of the directory. */
-const SHARED_MODULES = new Set(["board", "ids", "request", "seams", "timeline", "validate"]);
+const SHARED_MODULES = new Set(["board", "ids", "quips", "request", "seams", "timeline", "validate"]);
 
 export async function sharedModule(name: string): Promise<string | null> {
   if (!SHARED_MODULES.has(name)) return null;

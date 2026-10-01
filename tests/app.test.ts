@@ -904,3 +904,19 @@ test("every response isolates its window and resources; only the preview image i
     assert.ok(page.headers[h], h);
   }
 });
+
+test("every page carries the running version, and the client renders the footer (#32)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  for (const [url, signed] of [["/", false], ["/", true], ["/new", true]] as const) {
+    const res = await h.instance.inject({ method: "GET", url, headers: signed ? { cookie } : {} });
+    assert.match(String(stateOf(res.body)["version"]), /^([0-9a-f]{7}|dev)$/, url);
+  }
+  const client = (await h.instance.inject({ method: "GET", url: "/assets/app.js" })).body;
+  assert.match(client, /import \{ QUIPS, nextQuip, QUIP_EVERY_MS \} from "\/shared\/quips\.js"/);
+  assert.match(client, /setInterval\(\(\) => \{[\s\S]*?\}, QUIP_EVERY_MS\);/);
+  assert.match(client, /all rights not reserved/);
+  assert.match(client, /root\.append\(siteFooter\(\)\)/);
+  const quips = await h.instance.inject({ method: "GET", url: "/shared/quips.js" });
+  assert.equal(quips.statusCode, 200);
+});

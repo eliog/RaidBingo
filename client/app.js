@@ -6,6 +6,7 @@ import { winningCells, bestLineOf, FREE, FREE_CELL, ITEM_COUNT } from "/shared/b
 import { checkItems, validateCharName, ITEM_MAX, ITEM_SOFT_MAX, CHAT_MAX } from "/shared/validate.js";
 import { timeline } from "/shared/timeline.js";
 import { apiRequest } from "/shared/request.js";
+import { QUIPS, nextQuip, QUIP_EVERY_MS } from "/shared/quips.js";
 
 // The server embeds the page state as a JSON data block rather than a script,
 // so the CSP can forbid inline scripts outright.
@@ -903,5 +904,27 @@ function renderBoard() {
 }
 
 /* --------------------------------------------------------------- router */
+/* --------------------------------------------------------------- footer */
+// A rotating one-liner and the running commit (#32). In the page flow, after
+// everything else, so it never sits over the board.
+function siteFooter() {
+  let shown = nextQuip(-1);
+  const quip = h("p", { class: "quip", text: QUIPS[shown] });
+  const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setInterval(() => {
+    if (document.hidden) return;                 // no point changing it unseen
+    shown = nextQuip(shown);
+    if (calm) { quip.textContent = QUIPS[shown]; return; }
+    quip.classList.add("fading");
+    setTimeout(() => { quip.textContent = QUIPS[shown]; quip.classList.remove("fading"); }, 400);
+  }, QUIP_EVERY_MS);
+  return h("footer", { class: "site-foot" },
+    quip,
+    h("p", { class: "fine" },
+      `\u00A9 ${new Date().getFullYear()} Claude \u00B7 all rights not reserved \u00B7 `,
+      h("span", { class: "mono", title: "The commit this build was made from", text: `build ${S.version ?? "dev"}` })));
+}
+
 const views = { login: renderLogin, lobby: renderLobby, join: renderJoin, create: renderCreate, board: renderBoard };
 (views[S.view] ?? renderLogin)();
+root.append(siteFooter());
