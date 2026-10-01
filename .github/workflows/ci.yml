@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
 
+# CI only reads the code. Without this the token gets the repo default,
+# which can include write access (#30).
+permissions:
+  contents: read
+
 jobs:
   secrets:
     name: secret scan
