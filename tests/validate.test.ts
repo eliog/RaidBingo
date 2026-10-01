@@ -140,3 +140,49 @@ test("noncharacters and lone surrogates never get into stored text (#17)", () =>
   const n = validateCharName("Thal\uFFFFgrim");
   assert.ok(n.ok && n.value === "Thalgrim");
 });
+
+const ACUTE = "́", GRAVE = "̀", RING = "̊", TILDE = "̃", DOT = "̣";
+const marksAfter = (s: string) => Math.max(0, ...(s.match(/\p{M}+/gu) ?? []).map((run) => [...run].length));
+
+test("a pile of combining marks is cut to four per character, everywhere (#25)", () => {
+  const zalgo = "a" + ACUTE.repeat(299);
+  const chat = validateMessage(zalgo);
+  assert.ok(chat.ok);
+  // NFC first folds a + the first accent into á; the cap then keeps four more.
+  assert.equal(chat.value, "\u00E1" + ACUTE.repeat(4));
+  assert.equal(marksAfter(chat.value), 4);
+
+  const mixed = "h" + [ACUTE, GRAVE, RING, TILDE, DOT, ACUTE, GRAVE].join("") + "i" + GRAVE.repeat(9);
+  assert.ok(marksAfter(cleanText(mixed)) <= 4);
+  assert.ok(marksAfter(normalizeCharName("Thal" + DOT.repeat(20) + "grim")) <= 4);
+  const title = validateTitle("BT" + TILDE.repeat(30) + " run");
+  assert.ok(title.ok && marksAfter(title.value) <= 4);
+  const check = checkItems(Array.from({ length: 24 }, (_, i) => `square ${i}` + RING.repeat(12)));
+  assert.ok(check.items.every((s) => marksAfter(s) <= 4));
+});
+
+test("real writing and emoji pass through untouched by the mark cap (#25)", () => {
+  const samples = [
+    "Tiếng Việt có dấu",                      // Vietnamese
+    "Tiếng Việt",     // the same, decomposed: up to 2 in a row
+    "नमस्ते क्षत्रिय",                            // Devanagari, with virama conjuncts
+    "น้ำใจ ที่สุด",                              // Thai
+    "שָׁלוֹם עֲלֵיכֶם",                            // pointed Hebrew
+    "مُحَمَّدٌ",                                  // vowelled Arabic, shadda + vowel
+    "བོད་སྐད་",                                  // Tibetan stacks
+    "1️⃣ #️⃣",             // keycaps: VS16 + enclosing keycap
+    "\u{1F469}‍❤️‍\u{1F468} \u{1F3F3}️‍\u{1F308}",
+    "ok \u{1F44D}\u{1F3FD} gz",               // skin tone modifier (not a mark)
+  ];
+  for (const s of samples) {
+    const nfc = s.normalize("NFC");
+    assert.equal(cleanText(s), nfc, JSON.stringify(s));
+    const msg = validateMessage(s);
+    assert.ok(msg.ok && msg.value === nfc, JSON.stringify(s));
+  }
+});
+
+test("text that is nothing but marks is still refused (#25)", () => {
+  assert.equal(validateMessage(ACUTE.repeat(50)).ok, false);
+  assert.equal(validateCharName(DOT.repeat(10)).ok, false);
+});

@@ -53,6 +53,14 @@ const INVISIBLE =
 const KEEP_IN_TEXT = new Set(["\u200C", "\u200D", "\uFE0E", "\uFE0F"]);
 
 /**
+ * Combining marks after one character: real writing uses two or three in a
+ * row (Vietnamese, pointed Hebrew, vowelled Arabic, Indic and Tibetan
+ * stacks, emoji keycaps); hundreds is "zalgo" text that paints over the
+ * lines around it. Keep the first four, drop the rest.
+ */
+const MARK_PILE = /(\p{M}{4})\p{M}+/gu;
+
+/**
  * The one clean-up for anything a player types that others will see: NFC,
  * invisible characters out, whitespace collapsed. Line breaks and the other
  * separators become spaces first, so a pasted two-liner keeps its word break.
@@ -62,6 +70,7 @@ export function cleanText(raw: string, mode: "text" | "name" = "text"): string {
     .normalize("NFC")
     .replace(/[\t\n\v\f\r\u0085\u2028\u2029]/g, " ")
     .replace(INVISIBLE, (c) => (mode === "text" && KEEP_IN_TEXT.has(c) ? c : ""))
+    .replace(MARK_PILE, "$1")
     .replace(/\s+/g, " ")
     .trim();
 }
