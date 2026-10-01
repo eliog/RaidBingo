@@ -136,6 +136,16 @@ export function registerAuthRoutes(app: FastifyInstance, deps: Deps): void {
     const pid = derivePid(discordUserId, deps.config.pidSecret);
     await deps.repo.upsertPlayer(pid, now);
 
+    // This browser's previous session, if any, is being replaced: nothing
+    // will hold that token again, so it shouldn't stay valid for the rest of
+    // its 90 days. Only this one — the player's other devices stay signed in.
+    const previous = parseCookies(request.headers.cookie)[SESSION_COOKIE];
+    if (previous !== undefined && previous !== "") {
+      const hash = hashSessionToken(previous);
+      await deps.repo.deleteSession(hash);
+      endSessionSockets(hash);
+    }
+
     const token = newSessionToken();
     await deps.repo.createSession({
       tokenHash: hashSessionToken(token),

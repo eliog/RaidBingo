@@ -469,3 +469,26 @@ test("the sweep closes sockets whose session expired or was deleted, and keeps v
     s3.close();
   } finally { await h.stop(); }
 });
+
+test("logging in again closes the sockets the replaced session opened (#20)", async () => {
+  const h = await live();
+  try {
+    const old = await sessionFor(h, "owner-pid", SESSION_MS);
+    const created = await h.service.createGame("owner-pid", "Tuesday BT run", items());
+    assert.ok(created.ok);
+    await h.service.joinGame("owner-pid", created.value, "Felwarden");
+    const sock = h.socket(created.value, old.cookie);
+    await sock.until((m) => m["type"] === "state");
+    const closed = closeCode(sock.ws);
+
+    const base = `http://127.0.0.1:${h.port}`;
+    const login = await fetch(`${base}/auth/login?returnTo=%2F`, { headers: { cookie: old.cookie }, redirect: "manual" });
+    const state = new URL(login.headers.get("location") as string).searchParams.get("state") as string;
+    const nonce = (login.headers.get("set-cookie") as string).split(";")[0] as string;
+    const cb = await fetch(`${base}/auth/callback?code=abc&state=${encodeURIComponent(state)}`,
+      { headers: { cookie: `${old.cookie}; ${nonce}` }, redirect: "manual" });
+    assert.equal(cb.status, 302);
+    assert.equal(await closed, 4401);
+    assert.equal(await h.repo.findSession(old.hash, Date.now()), null);
+  } finally { await h.stop(); }
+});

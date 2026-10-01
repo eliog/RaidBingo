@@ -9,6 +9,7 @@ import { SESSION_COOKIE, OAUTH_COOKIE } from "../server/auth.ts";
 import { LOOKUP_MISSES, LOOKUP_WINDOW_MS } from "../server/routes.ts";
 import { apiRequest } from "../shared/request.ts";
 import { SIGNED_OUT } from "../server/ws.ts";
+import { SESSION_MS } from "../server/identity.ts";
 import { usePresetFile } from "../server/presets.ts";
 import { writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -661,4 +662,51 @@ test("the client treats close code 4401 as signed out, not as a blip to retry (#
   const client = await h.instance.inject({ method: "GET", url: "/assets/app.js" });
   assert.match(client.body, /if \(ev\.code === 4401\) \{ location\.reload\(\); return; \}/);
   assert.equal(SIGNED_OUT, 4401, "server and client agree on the code");
+});
+
+/** Logs in again from a browser that already holds `existing` (any cookie string). */
+async function relogin(h: ReturnType<typeof app>, existing: string, discordUserId = "1099"): Promise<string> {
+  const login = await h.instance.inject({ method: "GET", url: "/auth/login?returnTo=%2F", headers: { cookie: existing } });
+  const state = new URL(login.headers["location"] as string).searchParams.get("state") as string;
+  h.discord.exchangeCode = async () => ({ discordUserId });
+  const cb = await h.instance.inject({ method: "GET", url: `/auth/callback?code=abc&state=${encodeURIComponent(state)}`,
+    headers: { cookie: `${existing}; ${cookieFrom(login.headers["set-cookie"])}` } });
+  assert.equal(cb.statusCode, 302);
+  return cookieFrom(cb.headers["set-cookie"]);
+}
+
+const signedIn = async (h: ReturnType<typeof app>, cookie: string) =>
+  (await h.instance.inject({ method: "GET", url: "/api/games/wyrm-lantern-ward", headers: { cookie } })).statusCode !== 401;
+
+test("logging in again revokes the session this browser had, and only that one (#20)", async () => {
+  const h = app();
+  const first = await signIn(h, "1");
+  const otherDevice = await signIn(h, "1");
+  const someoneElse = await signIn(h, "2");
+  for (const c of [first, otherDevice, someoneElse]) assert.ok(await signedIn(h, c));
+
+  const second = await relogin(h, first, "1");
+  assert.notEqual(second, first);
+  assert.equal(await signedIn(h, first), false, "the replaced token no longer works");
+  assert.ok(await signedIn(h, second));
+  assert.ok(await signedIn(h, otherDevice), "the player's other device stays signed in");
+  assert.ok(await signedIn(h, someoneElse));
+});
+
+test("logging in as someone else from the same browser also ends the old session (#20)", async () => {
+  const h = app();
+  const asAlice = await signIn(h, "1");
+  const asBob = await relogin(h, asAlice, "2");
+  assert.equal(await signedIn(h, asAlice), false);
+  assert.ok(await signedIn(h, asBob));
+});
+
+test("a re-login with a stale, unknown or malformed session cookie still works (#20)", async () => {
+  const h = app();
+  const stale = await signIn(h, "1");
+  h.clock.advance(SESSION_MS + 1);
+  for (const existing of [stale, `${SESSION_COOKIE}=never-issued`, `${SESSION_COOKIE}=%E0%A4%A`, `${SESSION_COOKIE}=`]) {
+    const fresh = await relogin(h, existing, "1");
+    assert.ok(await signedIn(h, fresh), existing);
+  }
 });
