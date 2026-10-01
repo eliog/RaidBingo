@@ -423,3 +423,21 @@ test("a theme outside the three choices is refused, and so is an anonymous one",
   const anon = await h.instance.inject({ method: "POST", url: "/api/me/theme", payload: { theme: "dark" } });
   assert.equal(anon.statusCode, 401);
 });
+
+test("a stranger's game page and api carry no squares, names or boards (#8)", async () => {
+  const h = app();
+  const owner = await signIn(h, "1");
+  const stranger = await signIn(h, "2");
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie: owner },
+    payload: { title: "Tuesday BT run", items: items() } });
+  const id = (made.json() as { id: string }).id;
+  await h.instance.inject({ method: "POST", url: `/api/games/${id}/join`, headers: { cookie: owner },
+    payload: { charName: "Felwarden" } });
+
+  for (const url of [`/g/${id}`, `/api/games/${id}`]) {
+    const res = await h.instance.inject({ method: "GET", url, headers: { cookie: stranger } });
+    assert.equal(res.statusCode, 200, url);
+    assert.ok(!res.body.includes("Felwarden"), `${url} leaked a name`);
+    assert.ok(!res.body.includes(items()[0] as string), `${url} leaked a square`);
+  }
+});

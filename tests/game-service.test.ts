@@ -378,3 +378,26 @@ test("a game that does not exist is not found, never a crash", async () => {
     assert.equal(r.ok ? "" : r.error.code, "not_found");
   }
 });
+
+test("someone holding only the link sees the join screen, not the night (#8)", async () => {
+  const h = await withGame();
+  assert.ok((await h.service.joinGame(OWNER, h.gameId, "Felwarden")).ok);
+  assert.ok((await h.service.joinGame(ALICE, h.gameId, "Thalgrim")).ok);
+  assert.ok((await h.service.call(OWNER, h.gameId, 3)).ok);
+
+  const stranger = await h.service.view(BOB, h.gameId);
+  assert.ok(stranger.ok);
+  assert.equal(stranger.value.title, "Tuesday BT run");
+  assert.deepEqual(stranger.value.items, []);
+  assert.deepEqual(stranger.value.called, []);
+  assert.deepEqual(stranger.value.roster, []);
+  const text = JSON.stringify(stranger.value);
+  for (const leak of ["Thalgrim", "Felwarden", items()[0] as string]) assert.ok(!text.includes(leak), leak);
+
+  // Members, and the owner before taking a board, still get the whole game.
+  const member = await h.service.view(ALICE, h.gameId);
+  assert.ok(member.ok && member.value.items.length === ITEM_COUNT && member.value.roster.length === 2);
+  const h2 = await withGame();
+  const owner = await h2.service.view(OWNER, h2.gameId);
+  assert.ok(owner.ok && owner.value.items.length === ITEM_COUNT && owner.value.isOwner);
+});

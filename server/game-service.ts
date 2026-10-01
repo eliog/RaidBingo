@@ -405,6 +405,17 @@ export class GameService {
     const roster = await this.#repo.rosterFor(gameId);
     const mine = roster.find((r) => r.pid === pid) ?? null;
 
+    // Someone holding only the link gets the join screen, not the night: the
+    // squares can name real guild members, and the roster and boards belong
+    // to the people playing. The owner sees everything before taking a board.
+    if (mine === null && game.ownerPid !== pid) {
+      return ok({
+        id: game.id, title: game.title, closed: game.closedAt !== null,
+        isOwner: false, canCall: false, items: [], itemsFrozen: game.itemsFrozen,
+        board: null, charName: null, called: [], roster: [],
+      });
+    }
+
     return ok({
       id: game.id,
       title: game.title,
