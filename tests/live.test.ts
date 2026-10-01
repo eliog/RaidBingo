@@ -46,8 +46,8 @@ async function live() {
    * Buffers from creation. The server pushes state the instant the socket is
    * accepted, so a listener attached after `open` misses the first frame.
    */
-  function socket(gameId: string, cookie: string) {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws/${gameId}`, { headers: { cookie } });
+  function socket(gameId: string, cookie: string, headers: Record<string, string> = {}) {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws/${gameId}`, { headers: { cookie, ...headers } });
     const seen: Record<string, unknown>[] = [];
     const waiting: ((m: Record<string, unknown>) => void)[] = [];
     ws.on("message", (data) => {
@@ -230,4 +230,60 @@ test("a restart says goodbye before dropping the sockets", async () => {
 
   sock.close();
   await h.stop();
+});
+
+test("a chat message reaches both sockets as one chat frame, with no new state frame", async () => {
+  const h = await live();
+  try {
+    const owner = await h.signIn("owner-pid");
+    const player = await h.signIn("player-pid");
+    const created = await h.service.createGame("owner-pid", "Tuesday BT run", items());
+    assert.ok(created.ok);
+    const gameId = created.value;
+    await h.service.joinGame("owner-pid", gameId, "Felwarden");
+    await h.service.joinGame("player-pid", gameId, "Thalgrim");
+
+    const a = h.socket(gameId, owner);
+    await a.opened();
+    await a.until((m) => m["type"] === "state");
+    const b = h.socket(gameId, player);
+    await b.opened();
+    // b connecting re-pushes state to the whole room; let both settle.
+    await Promise.all([a.until((m) => m["type"] === "state"), b.until((m) => m["type"] === "state")]);
+
+    const chat = (m: Record<string, unknown>) => m["type"] === "chat";
+    const both = Promise.all([a.until(chat), b.until(chat)]);
+    const res = await h.post(`/api/games/${gameId}/chat`, player, { text: "pull already" });
+    assert.equal(res.status, 200);
+    for (const frame of await both) {
+      assert.deepEqual(Object.keys(frame).sort(), ["message", "type"]);
+      const message = frame["message"] as Record<string, unknown>;
+      assert.equal(message["charName"], "Thalgrim");
+      assert.equal(message["text"], "pull already");
+      assert.equal(message["seq"], 1);
+      assert.ok(!JSON.stringify(frame).includes("player-pid"));
+    }
+
+    // Posting must not have dragged a state frame along with it.
+    await assert.rejects(a.until((m) => m["type"] === "state", 300));
+
+    a.close(); b.close();
+  } finally { await h.stop(); }
+});
+
+test("a socket from a foreign origin is refused; the site's own origin is accepted", async () => {
+  const h = await live();
+  try {
+    const owner = await h.signIn("owner-pid");
+    const created = await h.service.createGame("owner-pid", "Tuesday BT run", items());
+    assert.ok(created.ok);
+    await h.service.joinGame("owner-pid", created.value, "Felwarden");
+
+    const foreign = h.socket(created.value, owner, { origin: "https://evil.test" });
+    await assert.rejects(foreign.opened(), "a cross-site page must not get the feed");
+
+    const ours = h.socket(created.value, owner, { origin: "https://raidbingo.test" });
+    await ours.opened();
+    ours.close();
+  } finally { await h.stop(); }
 });

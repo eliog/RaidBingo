@@ -303,3 +303,90 @@ test("www redirects to the canonical origin, keeping the path", async () => {
   assert.equal(res.statusCode, 301);
   assert.equal(res.headers["location"], "https://raidbingo.test/g/a-b-c?x=1");
 });
+
+/* ----------------------------------------------------------------- chat */
+
+async function chatGame(h: ReturnType<typeof app>) {
+  const owner = await signIn(h, "owner-discord");
+  const { id } = (await h.instance.inject({
+    method: "POST", url: "/api/games", headers: { cookie: owner },
+    payload: { title: "Tuesday BT run", items: items() },
+  })).json() as { id: string };
+  await h.instance.inject({
+    method: "POST", url: `/api/games/${id}/join`, headers: { cookie: owner }, payload: { charName: "Felwarden" },
+  });
+  const stranger = await signIn(h, "stranger-discord");
+  return { id, owner, stranger };
+}
+
+test("chat needs a session", async () => {
+  const h = app();
+  const { id } = await chatGame(h);
+  const post = await h.instance.inject({ method: "POST", url: `/api/games/${id}/chat`, payload: { text: "hi" } });
+  const get = await h.instance.inject({ method: "GET", url: `/api/games/${id}/chat` });
+  assert.equal(post.statusCode, 401);
+  assert.equal(get.statusCode, 401);
+});
+
+test("chat is roster-only, both ways", async () => {
+  const h = app();
+  const { id, stranger } = await chatGame(h);
+  const post = await h.instance.inject({
+    method: "POST", url: `/api/games/${id}/chat`, headers: { cookie: stranger }, payload: { text: "hi" },
+  });
+  const get = await h.instance.inject({ method: "GET", url: `/api/games/${id}/chat`, headers: { cookie: stranger } });
+  assert.equal(post.statusCode, 403);
+  assert.equal(get.statusCode, 403);
+});
+
+test("a bad cursor, or both cursors, is a 400", async () => {
+  const h = app();
+  const { id, owner } = await chatGame(h);
+  for (const qs of ["after=-1", "after=abc", "after=1.5", "before=9999999999999999", "after=1&before=5"]) {
+    const res = await h.instance.inject({ method: "GET", url: `/api/games/${id}/chat?${qs}`, headers: { cookie: owner } });
+    assert.equal(res.statusCode, 400, qs);
+  }
+  const fine = await h.instance.inject({ method: "GET", url: `/api/games/${id}/chat`, headers: { cookie: owner } });
+  assert.deepEqual(fine.json(), { messages: [] });
+});
+
+test("an oversized chat body is refused before it is parsed", async () => {
+  const h = app();
+  const { id, owner } = await chatGame(h);
+  const res = await h.instance.inject({
+    method: "POST", url: `/api/games/${id}/chat`, headers: { cookie: owner },
+    payload: { text: "x".repeat(5000) },
+  });
+  assert.equal(res.statusCode, 413);
+});
+
+test("hostile text round-trips verbatim, and the sender is the session, not the body", async () => {
+  const h = app();
+  const { id, owner } = await chatGame(h);
+  const hostile = `<script>alert(1)</script><img src=x onerror="alert(2)">`;
+  const res = await h.instance.inject({
+    method: "POST", url: `/api/games/${id}/chat`, headers: { cookie: owner },
+    payload: { text: hostile, charName: "Someone Else", pid: "spoofed" },
+  });
+  assert.equal(res.statusCode, 200);
+  const { message } = res.json() as { message: { seq: number; charName: string; text: string } };
+  assert.equal(message.text, hostile);
+  assert.equal(message.charName, "Felwarden");
+
+  const page = await h.instance.inject({ method: "GET", url: `/api/games/${id}/chat?after=0`, headers: { cookie: owner } });
+  assert.equal((page.json() as { messages: { text: string }[] }).messages[0]?.text, hostile);
+});
+
+test("a full chat is a 409 with its own code, not a 429", async () => {
+  const h = app();
+  const { id, owner } = await chatGame(h);
+  const game = await h.repo.getGame(id);
+  const ownerRow = (await h.repo.rosterFor(id))[0];
+  assert.ok(game && ownerRow);
+  for (let i = 0; i < 5000; i++) await h.repo.addMessage(id, ownerRow.pid, `m${i}`, T0, 5000);
+  const res = await h.instance.inject({
+    method: "POST", url: `/api/games/${id}/chat`, headers: { cookie: owner }, payload: { text: "hello?" },
+  });
+  assert.equal(res.statusCode, 409);
+  assert.equal((res.json() as { error: { code: string } }).error.code, "full");
+});

@@ -34,6 +34,8 @@ export interface GameRow {
   itemsFrozen: boolean;
   createdAt: number;
   closedAt: number | null;
+  /** The last chat `seq` issued. Nothing deletes a message, so also the count. */
+  chatSeq: number;
 }
 
 export interface GamePlayerRow {
@@ -45,6 +47,16 @@ export interface GamePlayerRow {
   bingoAt: number | null;
   /** Granted by the owner. The owner always may, without a row flag. */
   canCall: boolean;
+}
+
+/** `charName` is resolved from the roster at read time. `pid` never leaves the server. */
+export interface MessageRow {
+  gameId: string;
+  seq: number;
+  pid: string;
+  charName: string;
+  text: string;
+  sentAt: number;
 }
 
 export interface SessionRow {
@@ -69,7 +81,8 @@ export interface Repository {
   findSession(tokenHash: string, now: number): Promise<SessionRow | null>;
   deleteSession(tokenHash: string): Promise<void>;
 
-  createGame(row: GameRow): Promise<void>;
+  /** A new game has issued no chat `seq` yet, so `chatSeq` is not the caller's to set. */
+  createGame(row: Omit<GameRow, "chatSeq">): Promise<void>;
   getGame(id: string): Promise<GameRow | null>;
   updateGameItems(id: string, items: string[]): Promise<void>;
   freezeGameItems(id: string): Promise<void>;
@@ -94,4 +107,16 @@ export interface Repository {
   addCall(gameId: string, itemIndex: number, at: number): Promise<void>;
   removeCall(gameId: string, itemIndex: number): Promise<void>;
   callsFor(gameId: string): Promise<Map<number, number>>;
+
+  /**
+   * Issues the next per-game `seq` and inserts, in one transaction. Returns
+   * null, inserting nothing, when the game already holds `ceiling` messages:
+   * the check is part of the same UPDATE, so two posts racing at the limit
+   * cannot both land.
+   */
+  addMessage(gameId: string, pid: string, text: string, at: number, ceiling: number): Promise<MessageRow | null>;
+  /** The last `limit` with seq > afterSeq, ascending. */
+  messagesAfter(gameId: string, afterSeq: number, limit: number): Promise<MessageRow[]>;
+  /** The last `limit` with seq < beforeSeq, ascending. How older history is reached. */
+  messagesBefore(gameId: string, beforeSeq: number, limit: number): Promise<MessageRow[]>;
 }

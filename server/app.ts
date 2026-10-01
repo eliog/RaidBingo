@@ -6,11 +6,14 @@ import { registerAuthRoutes } from "./auth.ts";
 import { sharedModule, clientAsset } from "./assets.ts";
 import { registerRoutes } from "./routes.ts";
 import type { GameHub } from "./ws.ts";
+import type { MessageView } from "./game-service.ts";
 
 /** Set once at startup; routes notify it after a mutation. */
 let hub: GameHub | null = null;
 export function setHub(h: GameHub | null): void { hub = h; }
 export function notifyGame(gameId: string): void { void hub?.push(gameId); }
+/** One small frame per message, so chat never drags the full state along. */
+export function notifyChat(gameId: string, message: MessageView): void { hub?.sendChat(gameId, message); }
 
 export interface Deps {
   config: Config;

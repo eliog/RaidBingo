@@ -55,6 +55,40 @@ export function validateTitle(raw: string): Result<string> {
   return ok(title);
 }
 
+/**
+ * Chat cap, in UTF-16 code units: `.length`, the same unit an input's
+ * `maxlength` counts, so the field and the server never disagree about an
+ * emoji.
+ */
+export const CHAT_MAX = 300;
+
+/**
+ * Characters that render as nothing or rearrange what is around them: C0 and
+ * C1 controls and DEL, zero-width characters, and bidi embeddings, overrides
+ * and isolates. Stripped rather than refused — a stray one from a paste
+ * should not cost someone their message.
+ */
+const INVISIBLE = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\uFEFF\u202A-\u202E\u2066-\u2069]/g;
+
+/**
+ * There is deliberately no blocklist of code-looking text: `<3` and `>inv`
+ * are banter. Rendering through textContent is the injection defence.
+ */
+export function validateMessage(raw: unknown): Result<string> {
+  if (typeof raw !== "string") return bad("A message has to be text.");
+  const text = raw
+    .normalize("NFC")
+    // Line and paragraph separators, tabs and newlines become spaces before
+    // the strip, so a pasted two-liner keeps its word break.
+    .replace(/[\t\n\v\f\r\u2028\u2029]/g, " ")
+    .replace(INVISIBLE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text === "") return bad("Type something first.");
+  if (text.length > CHAT_MAX) return bad(`Messages are at most ${CHAT_MAX} characters.`);
+  return ok(text);
+}
+
 export interface ItemProblem {
   /** Zero-based slot, so the editor can point at the right field. */
   index: number;

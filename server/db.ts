@@ -12,11 +12,16 @@
  *     double-fire.
  *   - `game_players` has a UNIQUE index on (game_id, char_name_key), so two
  *     players in one game cannot share a name even if a check races.
+ *
+ * Chat `seq` is issued from `games.chat_seq` by an UPDATE ... RETURNING in
+ * the same transaction as the insert. The update takes the game's row lock,
+ * so the same SQL stays correct on Postgres, where MAX(seq) + 1 would let two
+ * concurrent posts collide.
  */
 
 import { DatabaseSync } from "node:sqlite";
 import type {
-  Repository, PlayerRow, GameRow, GamePlayerRow, SessionRow,
+  Repository, PlayerRow, GameRow, GamePlayerRow, SessionRow, MessageRow,
 } from "./ports.ts";
 import { charNameKey } from "../shared/validate.ts";
 
@@ -44,7 +49,8 @@ CREATE TABLE IF NOT EXISTS games (
   items_json   TEXT NOT NULL,
   items_frozen INTEGER NOT NULL DEFAULT 0,
   created_at   INTEGER NOT NULL,
-  closed_at    INTEGER
+  closed_at    INTEGER,
+  chat_seq     INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 CREATE INDEX IF NOT EXISTS games_owner ON games(owner_pid, created_at DESC);
 
@@ -69,9 +75,18 @@ CREATE TABLE IF NOT EXISTS calls (
   called_at INTEGER NOT NULL,
   PRIMARY KEY (game_id, item_idx)
 ) STRICT;
+
+CREATE TABLE IF NOT EXISTS messages (
+  game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+  seq     INTEGER NOT NULL,
+  pid     TEXT NOT NULL REFERENCES players(pid),
+  text    TEXT NOT NULL,
+  sent_at INTEGER NOT NULL,
+  PRIMARY KEY (game_id, seq)
+) STRICT;
 `;
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /**
  * Schema changes have to reach databases that already hold real games, so
@@ -87,6 +102,15 @@ function migrate(db: DatabaseSync): void {
     const columns = db.prepare("PRAGMA table_info(game_players)").all() as { name?: unknown }[];
     if (!columns.some((c) => String(c["name"]) === "can_call")) {
       db.exec("ALTER TABLE game_players ADD COLUMN can_call INTEGER NOT NULL DEFAULT 0");
+    }
+  }
+
+  // The messages table arrives with SCHEMA's CREATE IF NOT EXISTS; the counter
+  // has to be added to games that already exist.
+  if (from < 3) {
+    const columns = db.prepare("PRAGMA table_info(games)").all() as { name?: unknown }[];
+    if (!columns.some((c) => String(c["name"]) === "chat_seq")) {
+      db.exec("ALTER TABLE games ADD COLUMN chat_seq INTEGER NOT NULL DEFAULT 0");
     }
   }
 
@@ -124,7 +148,22 @@ const toGame = (r: Row): GameRow => ({
   itemsFrozen: num(r["items_frozen"]) === 1,
   createdAt: num(r["created_at"]),
   closedAt: maybeNum(r["closed_at"]),
+  chatSeq: num(r["chat_seq"]),
 });
+
+const toMessage = (r: Row): MessageRow => ({
+  gameId: str(r["game_id"]),
+  seq: num(r["seq"]),
+  pid: str(r["pid"]),
+  charName: str(r["char_name"]),
+  text: str(r["text"]),
+  sentAt: num(r["sent_at"]),
+});
+
+/** The sender's name comes from the roster at read time; pid stays server-side. */
+const MESSAGE_COLUMNS = `m.game_id, m.seq, m.pid, gp.char_name, m.text, m.sent_at
+       FROM messages m
+       JOIN game_players gp ON gp.game_id = m.game_id AND gp.pid = m.pid`;
 
 const toGamePlayer = (r: Row): GamePlayerRow => ({
   gameId: str(r["game_id"]),
@@ -186,6 +225,22 @@ export function createRepository(db: DatabaseSync): Repository {
        ON CONFLICT(game_id, item_idx) DO NOTHING`),
     removeCall: db.prepare(`DELETE FROM calls WHERE game_id = ? AND item_idx = ?`),
     calls: db.prepare(`SELECT item_idx, called_at FROM calls WHERE game_id = ?`),
+
+    nextChatSeq: db.prepare(
+      `UPDATE games SET chat_seq = chat_seq + 1
+       WHERE id = ? AND chat_seq < ? RETURNING chat_seq`),
+    addMessage: db.prepare(
+      `INSERT INTO messages (game_id, seq, pid, text, sent_at) VALUES (?, ?, ?, ?, ?)`),
+    message: db.prepare(`SELECT ${MESSAGE_COLUMNS} WHERE m.game_id = ? AND m.seq = ?`),
+    // The LAST `limit` on each side of the cursor, re-sorted ascending.
+    messagesAfter: db.prepare(
+      `SELECT * FROM (SELECT ${MESSAGE_COLUMNS}
+         WHERE m.game_id = ? AND m.seq > ? ORDER BY m.seq DESC LIMIT ?)
+       ORDER BY seq ASC`),
+    messagesBefore: db.prepare(
+      `SELECT * FROM (SELECT ${MESSAGE_COLUMNS}
+         WHERE m.game_id = ? AND m.seq < ? ORDER BY m.seq DESC LIMIT ?)
+       ORDER BY seq ASC`),
   };
 
   return {
@@ -290,6 +345,30 @@ export function createRepository(db: DatabaseSync): Repository {
         out.set(num(r["item_idx"]), num(r["called_at"]));
       }
       return out;
+    },
+
+    async addMessage(gameId, pid, text, at, ceiling) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const next = q.nextChatSeq.get(gameId, ceiling) as Row | undefined;
+        if (next === undefined) {
+          db.exec("ROLLBACK");
+          return null;
+        }
+        const seq = num(next["chat_seq"]);
+        q.addMessage.run(gameId, seq, pid, text, at);
+        db.exec("COMMIT");
+        return toMessage(q.message.get(gameId, seq) as Row);
+      } catch (e) {
+        if (db.isTransaction) db.exec("ROLLBACK");
+        throw e;
+      }
+    },
+    async messagesAfter(gameId, afterSeq, limit) {
+      return (q.messagesAfter.all(gameId, afterSeq, limit) as Row[]).map(toMessage);
+    },
+    async messagesBefore(gameId, beforeSeq, limit) {
+      return (q.messagesBefore.all(gameId, beforeSeq, limit) as Row[]).map(toMessage);
     },
   };
 }

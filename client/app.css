@@ -236,3 +236,17 @@ textarea{min-height:160px;resize:vertical;line-height:1.5}
 .mini i.on{background:var(--fel-wash);border-color:var(--fel)}
 .mini i.win{background:var(--fel);border-color:var(--fel)}
 @media (min-width:700px){ .sheet .mini{max-width:260px;margin:0 auto} }
+
+/* chat: banter beside the board, with calls and bingos inline */
+.chat{max-height:360px;overflow-y:auto;overscroll-behavior:contain;padding:5px 0}
+@media (max-width:700px){ .chat{max-height:300px} }
+.chat .ev{padding:5px 14px;font-size:12.5px;font-style:italic;color:var(--ink-faint);display:flex;align-items:center;gap:8px}
+.chat .ev .what{flex:1;min-width:0}
+.chat .ev.bingo{color:var(--fel);font-weight:700;font-style:normal}
+.chat .msg{padding:5px 14px;font-size:13.5px;overflow-wrap:anywhere}
+.chat .msg .who{font-family:Cinzel,Georgia,serif;font-weight:700;margin-right:7px}
+.chat .msg.me .who{color:var(--fel)}
+.chat .msg time{float:right;margin-left:8px;font-size:11.5px;color:var(--ink-faint)}
+.chat .older{display:block;margin:2px auto 6px}
+.composer{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
+.composer input{flex:1;min-width:0}

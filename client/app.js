@@ -3,7 +3,8 @@
  * runs — served from /shared with types stripped at request time.
  */
 import { winningCells, bestLineOf, FREE, FREE_CELL, ITEM_COUNT } from "/shared/board.js";
-import { checkItems, validateCharName, ITEM_MAX, ITEM_SOFT_MAX } from "/shared/validate.js";
+import { checkItems, validateCharName, ITEM_MAX, ITEM_SOFT_MAX, CHAT_MAX } from "/shared/validate.js";
+import { timeline } from "/shared/timeline.js";
 
 const S = window.__RB__ ?? { view: "login", returnTo: "/" };
 const root = document.getElementById("app");
@@ -360,7 +361,7 @@ function renderBoard() {
   const banner = h("div", { class: "banner", hidden: true });
   const callbar = h("div", { class: "callbar", style: "margin-top:12px" });
   const rosterBody = h("div", { class: "body" });
-  const logBody = h("div", { class: "body" });
+  const chatBody = h("div", { class: "chat", role: "log", "aria-live": "polite" });
   const filter = h("input", { type: "text", placeholder: "filter items…" });
 
   /* one fitted size for the whole grid — 25 different sizes reads as a ransom note */
@@ -491,19 +492,107 @@ function renderBoard() {
       rosterBody.append(row);
     }
 
-    clear(logBody);
-    const recent = [...called.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-    if (!recent.length) logBody.append(h("p", { class: "empty" }, "Nothing called yet tonight."));
-    for (const [item, at] of recent) {
-      logBody.append(h("div", { class: "lrow" },
-        h("span", { class: "nm", style: "white-space:normal", text: game.items[item] }),
-        h("span", { class: "dim" }, clock(at)),
-        mayCall ? h("button", { class: "btn quiet sm", title: `Undo call: ${game.items[item]}`,
-          onclick: () => send("undo", item) }, "↩") : null));
-    }
-
+    drawChat();
     fit();
   }
+
+  /* ---- chat: messages, with the night's calls and bingos inline ------ */
+
+  // Keyed by seq, so a catch-up and a live frame that overlap merge harmlessly.
+  const chat = new Map();
+  let chatLoaded = false, loadingOlder = false, reachedStart = false;
+  const lowestSeq = () => (chat.size ? Math.min(...chat.keys()) : 0);
+  const highestSeq = () => (chat.size ? Math.max(...chat.keys()) : 0);
+  // seq is gap-free from 1, so holding 1 means holding the start of the chat.
+  const complete = () => chat.has(1) || reachedStart || (chatLoaded && chat.size === 0);
+
+  function drawChat({ keepOffset = false } = {}) {
+    const fromBottom = chatBody.scrollHeight - chatBody.scrollTop - chatBody.clientHeight;
+    const pinned = fromBottom < 8;
+    const events = timeline([...called.entries()], game.roster, [...chat.values()], complete());
+
+    clear(chatBody);
+    if (!complete() && chat.size) {
+      chatBody.append(h("button", { class: "btn quiet sm older", onclick: loadOlder }, "Earlier messages"));
+    }
+    if (!events.length) chatBody.append(h("p", { class: "empty" },
+      game.closed ? "Nobody said anything this time." : "Nothing yet tonight. Say something."));
+    for (const e of events) {
+      if (e.kind === "message") {
+        chatBody.append(h("div", { class: `msg ${e.charName === game.charName ? "me" : ""}` },
+          h("time", { text: clock(e.at) }),
+          h("span", { class: "who", text: e.charName }),
+          h("span", { text: e.text })));
+      } else if (e.kind === "call") {
+        chatBody.append(h("div", { class: "ev" },
+          h("span", { class: "what", text: `Called: ${game.items[e.item]}` }),
+          h("span", { text: clock(e.at) }),
+          mayCall ? h("button", { class: "btn quiet sm", title: `Undo call: ${game.items[e.item]}`,
+            onclick: () => send("undo", e.item) }, "↩") : null));
+      } else {
+        chatBody.append(h("div", { class: "ev bingo" },
+          h("span", { class: "what", text: `${e.charName} — BINGO` }),
+          h("span", { text: clock(e.at) })));
+      }
+    }
+
+    // Older history goes on top without moving what the reader is looking at;
+    // otherwise follow the conversation unless they have scrolled up to read.
+    if (keepOffset) chatBody.scrollTop = chatBody.scrollHeight - keepOffset;
+    else if (pinned) chatBody.scrollTop = chatBody.scrollHeight;
+  }
+
+  function mergeChat(messages) {
+    for (const m of messages) chat.set(m.seq, m);
+  }
+
+  /** On every socket open: first load, a blip and a restart are the same path. */
+  async function catchUp() {
+    try {
+      const { messages } = await api(`/api/games/${game.id}/chat?after=${highestSeq()}`, null, "GET");
+      mergeChat(messages);
+      chatLoaded = true;
+      drawChat();
+    } catch { /* the next open tries again */ }
+  }
+
+  async function loadOlder() {
+    if (loadingOlder || complete() || !chat.size) return;
+    loadingOlder = true;
+    try {
+      const { messages } = await api(`/api/games/${game.id}/chat?before=${lowestSeq()}`, null, "GET");
+      const offset = chatBody.scrollHeight - chatBody.scrollTop;
+      mergeChat(messages);
+      // Gap-free seq means an empty page only comes at the start, but never
+      // ask for it twice either way.
+      if (!messages.length) reachedStart = true;
+      drawChat({ keepOffset: offset });
+    } catch (e) { toast(e.message, { kind: "warn" }); }
+    finally { loadingOlder = false; }
+  }
+  chatBody.addEventListener("scroll", () => { if (chatBody.scrollTop < 40) loadOlder(); });
+
+  const chatInput = h("input", { type: "text", maxlength: String(CHAT_MAX),
+    placeholder: "Say something…", enterkeyhint: "send", autocomplete: "off", "aria-label": "Chat message" });
+  const chatSend = h("button", { class: "btn sm", type: "button" }, "Send");
+  async function postChat() {
+    const text = chatInput.value;
+    if (!text.trim() || chatSend.disabled) return;
+    chatSend.disabled = true;
+    try {
+      // No optimistic path: our own message arrives over the socket like
+      // everyone else's, so there is one ordering for everybody.
+      await api(`/api/games/${game.id}/chat`, { text });
+      chatInput.value = "";
+    } catch (e) { toast(e.message, { kind: "warn" }); }
+    finally { chatSend.disabled = false; chatInput.focus(); }
+  }
+  chatSend.addEventListener("click", postChat);
+  chatInput.addEventListener("keydown", (e) => {
+    // Enter while an IME is composing confirms a candidate; it must not post.
+    if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); postChat(); }
+  });
+  const composer = h("div", { class: "composer" }, chatInput, chatSend);
 
   /* ---- a peek at someone else's board ------------------------------- */
 
@@ -639,10 +728,12 @@ function renderBoard() {
     socket.addEventListener("open", () => {
       backoff = 1000; restarting = false; downSince = 0;
       setConn("live", "Live");
+      catchUp();
     });
     socket.addEventListener("message", (ev) => {
       const msg = JSON.parse(ev.data);
       if (msg.type === "goodbye") { restarting = true; setConn("down", "Restarting — back in a moment"); return; }
+      if (msg.type === "chat") { mergeChat([msg.message]); drawChat(); return; }
       if (msg.type !== "state") return;
       // Full state replaces local state; deltas are never merged across a gap.
       called = new Map(msg.called);
@@ -651,6 +742,8 @@ function renderBoard() {
       // The owner can grant or revoke mid-raid; the board has to become
       // usable, or stop being usable, without a reload.
       mayCall = !game.closed && (owner || game.roster.some((r) => r.you && r.canCall));
+      // A game closing mid-raid takes the composer with it.
+      composer.hidden = game.closed;
       draw();
     });
     socket.addEventListener("close", () => {
@@ -672,7 +765,8 @@ function renderBoard() {
   const rail = h("aside", { class: "stack" },
     h("div", { class: "panel" }, h("h2", null, h("span", null, "Standings"),
       h("span", { class: "dim tabular", text: String(game.roster.length) })), rosterBody),
-    h("div", { class: "panel" }, h("h2", null, h("span", null, "Call log")), logBody));
+    h("div", { class: "panel" }, h("h2", null, h("span", null, "Chat")), chatBody,
+      game.closed ? null : composer));
 
   root.append(masthead(), h("main", { class: "wrap", style: "padding-block:22px 48px" },
     h("div", { class: "row", style: "gap:10px 24px" },

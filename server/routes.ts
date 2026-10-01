@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { notifyGame, type Deps } from "./app.ts";
+import { notifyGame, notifyChat, type Deps } from "./app.ts";
 import { GameService, type ServiceError } from "./game-service.ts";
 import { currentPid } from "./auth.ts";
 import { RateLimiter } from "./rate-limit.ts";
@@ -18,7 +18,16 @@ const STATUS: Record<ServiceError["code"], number> = {
   invalid: 400,
   rate_limited: 429,
   already_joined: 409,
+  full: 409,
 };
+
+/** A chat cursor: absent, or a non-negative safe integer. */
+function cursor(raw: unknown): number | null | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "string" || !/^\d{1,15}$/.test(raw)) return null;
+  const n = Number(raw);
+  return Number.isSafeInteger(n) ? n : null;
+}
 
 function fail(reply: FastifyReply, error: ServiceError): FastifyReply {
   return reply.code(STATUS[error.code]).send({ error });
@@ -283,6 +292,38 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
       if (!r.ok) return fail(reply, r.error);
       notifyGame(request.params.id);
       return reply.send({ charName: r.value, canCall });
+    },
+  );
+
+  // Refused before parsing: 300 characters is far under 4 KB even escaped.
+  app.post<{ Params: { id: string }; Body: { text?: unknown } }>(
+    "/api/games/:id/chat",
+    { bodyLimit: 4096 },
+    async (request, reply) => {
+      const pid = await requirePid(request, reply);
+      if (pid === null) return reply;
+      // The body carries only text; the sender is whoever the session says.
+      const posted = await service.postMessage(request.params.id, pid, (request.body ?? {}).text);
+      if (!posted.ok) return fail(reply, posted.error);
+      notifyChat(request.params.id, posted.value);
+      return reply.send({ message: posted.value });
+    },
+  );
+
+  app.get<{ Params: { id: string }; Querystring: { after?: unknown; before?: unknown } }>(
+    "/api/games/:id/chat",
+    async (request, reply) => {
+      const pid = await requirePid(request, reply);
+      if (pid === null) return reply;
+      const after = cursor(request.query.after);
+      const before = cursor(request.query.before);
+      if (after === null || before === null || (after !== undefined && before !== undefined)) {
+        return fail(reply, { code: "invalid", message: "Give one of after or before, as a whole number." });
+      }
+      const page = before !== undefined
+        ? await service.messagesBefore(request.params.id, pid, before)
+        : await service.messagesAfter(request.params.id, pid, after ?? 0);
+      return page.ok ? reply.send({ messages: page.value }) : fail(reply, page.error);
     },
   );
 

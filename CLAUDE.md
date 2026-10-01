@@ -37,6 +37,21 @@ numbers, no content tables. The app never talks to the game client.
   never on a mark count. A marks column would show one number for the whole raid.
 - The night continues past the first bingo; winners are ranked by time.
 
+### Chat
+
+Players in a game can post short messages beside the board, with calls and bingos inline
+so the stream reads as reactions to what happened. Spec:
+`docs/superpowers/specs/2026-09-30-chat-design.md`.
+
+- **Roster only**, both to read and to post. A closed game's chat is read-only, and
+  readable back to the first message — nothing deletes one.
+- Single-line, 300 UTF-16 code units, invisible and bidi characters stripped. Rendered
+  through `textContent` only.
+- 5 posts per 10 s per player per game; 5,000 per game, refused as `full` (409).
+- Posting is not activity: the idle clock still runs on calls alone.
+- Calls and bingos are derived from the state push (`shared/timeline.ts`), so an undo
+  erases its event with no chat-specific code.
+
 ## Games
 
 Concurrent games are supported. Each has its own title, items, owner, roster and calls.
@@ -217,13 +232,19 @@ Vitest dependency.
 
     players(pid, last_name_used, created_at, last_seen)
     sessions(token_hash, pid, created_at, expires_at)
-    games(id, title, owner_pid, items_json, created_at, closed_at)
+    games(id, title, owner_pid, items_json, created_at, closed_at, chat_seq)
     game_players(game_id, pid, char_name, board_json, joined_at, bingo_at, can_call)
     calls(game_id, item_idx, called_at)        -- PK (game_id, item_idx)
+    messages(game_id, seq, pid, text, sent_at) -- PK (game_id, seq)
 
 - `calls` holds one row per called item: a square is called iff the row exists, and undo is
   a plain delete.
 - `char_name` lives on `game_players`, not `players`, because people bring alts.
+- Message `seq` is per game, issued from `games.chat_seq` by `UPDATE ... RETURNING` in the
+  insert's transaction. The same SQL is correct on Postgres, where `MAX(seq) + 1` would
+  collide; a global id was rejected because its gaps leak how busy other games are. A
+  message's sender name is resolved from `game_players` at read time; its `pid` never
+  reaches the client.
 - `can_call` is per game, not per player: being a caller on Tuesday says nothing about
   Wednesday. The owner is a caller implicitly and carries no flag.
 - **Boards are stored, not derived.** Deal once, server-side, at join time, with

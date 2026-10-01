@@ -17,6 +17,7 @@ import type { Deps } from "./app.ts";
 import { parseCookies, SESSION_COOKIE } from "./auth.ts";
 import { hashSessionToken } from "./identity.ts";
 import { bestLineOf } from "../shared/board.ts";
+import type { MessageView } from "./game-service.ts";
 
 export interface LivePayload {
   type: "state";
@@ -48,6 +49,15 @@ export class GameHub {
         if (match === null) return socket.destroy();
 
         const gameId = match[1] as string;
+
+        // Defence in depth on top of SameSite=Lax: a browser always sends
+        // Origin on a socket handshake, so a cross-site page is refused here
+        // even if a cookie somehow rode along. Non-browser clients send none.
+        const origin = request.headers.origin;
+        if (origin !== undefined && origin !== new URL(this.#deps.config.baseUrl).origin) {
+          return socket.destroy();
+        }
+
         const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
         if (token === undefined) return socket.destroy();
 
@@ -114,6 +124,20 @@ export class GameHub {
     };
 
     const text = JSON.stringify(payload);
+    for (const ws of room) {
+      if (ws.readyState === ws.OPEN) ws.send(text);
+    }
+  }
+
+  /**
+   * A chat message to everyone in the room, serialised once. The state frame
+   * is untouched, so a call costs what it always did and a message costs about
+   * 100 bytes per client.
+   */
+  sendChat(gameId: string, message: MessageView): void {
+    const room = this.#rooms.get(gameId);
+    if (room === undefined) return;
+    const text = JSON.stringify({ type: "chat", message });
     for (const ws of room) {
       if (ws.readyState === ws.OPEN) ws.send(text);
     }

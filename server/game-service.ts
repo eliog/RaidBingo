@@ -3,19 +3,30 @@
  * thin and the rules stay testable without HTTP.
  */
 
-import type { Repository, GameRow } from "./ports.ts";
+import type { Repository, GameRow, MessageRow } from "./ports.ts";
 import type { Clock, Rng } from "../shared/seams.ts";
 import { dealUniqueBoard, hasBingo, markCount, bestLineOf, ITEM_COUNT } from "../shared/board.ts";
 import { generateId } from "../shared/ids.ts";
-import { checkItems, validateCharName, validateTitle, normalizeCharName } from "../shared/validate.ts";
+import {
+  checkItems, validateCharName, validateTitle, normalizeCharName, validateMessage,
+} from "../shared/validate.ts";
+import type { ChatMessage } from "../shared/timeline.ts";
+import { RateLimiter } from "./rate-limit.ts";
 
 export const IDLE_CLOSE_MS = 8 * 60 * 60 * 1000;
 export const GAMES_PER_DAY = 5;
 export const MAX_PREVIOUS_SETS = 8;
 
+/** Bounds disk: the rate limit alone allows ~14,000 a player over a night. */
+export const CHAT_CEILING = 5000;
+/** Fixed server-side; the client cannot ask for more. */
+export const CHAT_PAGE = 200;
+export const CHAT_BURST = 5;
+export const CHAT_WINDOW_MS = 10_000;
+
 export type ErrorCode =
   | "not_found" | "forbidden" | "closed" | "frozen"
-  | "name_taken" | "invalid" | "rate_limited" | "already_joined";
+  | "name_taken" | "invalid" | "rate_limited" | "already_joined" | "full";
 
 export interface ServiceError {
   code: ErrorCode;
@@ -71,6 +82,11 @@ export interface GameView {
   roster: RosterEntry[];
 }
 
+/** A message as the client sees it. Never a pid. */
+export type MessageView = ChatMessage;
+
+const toView = (m: MessageRow): MessageView => ({ seq: m.seq, charName: m.charName, text: m.text, at: m.sentAt });
+
 export interface GameSummary {
   id: string;
   title: string;
@@ -90,11 +106,14 @@ export class GameService {
   readonly #rng: Rng;
   /** Game creations per pid, for the daily cap. Resets on restart; fine. */
   readonly #creations = new Map<string, number[]>();
+  /** Keyed `${gameId}:${pid}`. One Discord account is one pid. */
+  readonly #chatLimiter: RateLimiter;
 
   constructor(repo: Repository, clock: Clock, rng: Rng) {
     this.#repo = repo;
     this.#clock = clock;
     this.#rng = rng;
+    this.#chatLimiter = new RateLimiter(clock, CHAT_BURST, CHAT_WINDOW_MS);
   }
 
   /** A game is closed if it was closed explicitly, or has gone quiet for 8h. */
@@ -247,9 +266,8 @@ export class GameService {
    *
    * Returns the character names that newly completed a line.
    */
-  async #reconcileBingos(gameId: string): Promise<string[]> {
+  async #reconcileBingos(gameId: string, now = this.#clock.now()): Promise<string[]> {
     const called = new Set((await this.#repo.callsFor(gameId)).keys());
-    const now = this.#clock.now();
     const fresh: string[] = [];
     for (const row of await this.#repo.rosterFor(gameId)) {
       const won = hasBingo(row.board, called);
@@ -305,8 +323,11 @@ export class GameService {
       return err("invalid", "That square isn't on this board.");
     }
     // Idempotent by primary key, so the reflex double-tap is safe.
-    await this.#repo.addCall(gameId, itemIndex, this.#clock.now());
-    return ok({ winners: await this.#reconcileBingos(gameId) });
+    const now = this.#clock.now();
+    await this.#repo.addCall(gameId, itemIndex, now);
+    // A bingo's time is exactly the time of the call that completed the line;
+    // the chat timeline orders the call first on that tie.
+    return ok({ winners: await this.#reconcileBingos(gameId, now) });
   }
 
   async undo(pid: string, gameId: string, itemIndex: number): Promise<Result<null>> {
@@ -321,6 +342,58 @@ export class GameService {
     // goes with it.
     await this.#reconcileBingos(gameId);
     return ok(null);
+  }
+
+  /**
+   * Refusals, in order: not_found, forbidden, closed, invalid, full,
+   * rate_limited. `full` is checked before the limiter so a refused post does
+   * not spend one of the five, and again atomically inside the insert, which
+   * catches two posts racing at the ceiling.
+   *
+   * Posting is not activity: the idle clock still runs on calls alone.
+   */
+  async postMessage(gameId: string, pid: string, raw: unknown): Promise<Result<MessageView>> {
+    const game = await this.#liveGame(gameId);
+    if (game === null) return err("not_found", "That game doesn't exist.");
+    if ((await this.#repo.getGamePlayer(gameId, pid)) === null) {
+      return err("forbidden", "Only players in this game can chat in it.");
+    }
+    if (game.closedAt !== null) return err("closed", "That game is closed. The chat is read-only now.");
+    const text = validateMessage(raw);
+    if (!text.ok) return err("invalid", text.reason);
+
+    const full = (): Result<never> => err("full", "This game's chat is full.");
+    if (game.chatSeq >= CHAT_CEILING) return full();
+    const wait = this.#chatLimiter.check(`${gameId}:${pid}`);
+    if (wait !== null) {
+      return err("rate_limited", `Slow down — you can post again in ${wait} second${wait === 1 ? "" : "s"}.`);
+    }
+
+    const row = await this.#repo.addMessage(gameId, pid, text.value, this.#clock.now(), CHAT_CEILING);
+    return row === null ? full() : ok(toView(row));
+  }
+
+  /** The last page after the cursor. Cursor 0 is first load; the same call covers a reconnect. */
+  async messagesAfter(gameId: string, pid: string, afterSeq: number): Promise<Result<MessageView[]>> {
+    const denied = await this.#mayRead(gameId, pid);
+    if (denied !== null) return denied;
+    return ok((await this.#repo.messagesAfter(gameId, afterSeq, CHAT_PAGE)).map(toView));
+  }
+
+  /** The page before the cursor: how a reader scrolls back, to the first message. */
+  async messagesBefore(gameId: string, pid: string, beforeSeq: number): Promise<Result<MessageView[]>> {
+    const denied = await this.#mayRead(gameId, pid);
+    if (denied !== null) return denied;
+    return ok((await this.#repo.messagesBefore(gameId, beforeSeq, CHAT_PAGE)).map(toView));
+  }
+
+  /** Roster only. A closed game stays readable. */
+  async #mayRead(gameId: string, pid: string): Promise<Result<never> | null> {
+    if ((await this.#repo.getGame(gameId)) === null) return err("not_found", "That game doesn't exist.");
+    if ((await this.#repo.getGamePlayer(gameId, pid)) === null) {
+      return err("forbidden", "Only players in this game can read its chat.");
+    }
+    return null;
   }
 
   async view(pid: string, gameId: string): Promise<Result<GameView>> {
