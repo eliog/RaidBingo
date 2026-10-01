@@ -596,3 +596,23 @@ test("call and undo accept only an integer square, and garbage calls nothing (#1
   assert.equal((await send("undo", { item: 0 })).statusCode, 200);
   assert.deepEqual([...(await h.repo.callsFor(id)).keys()], [23]);
 });
+
+test("a malformed cookie is skipped, not a 500 on every page (#16)", async () => {
+  const h = app();
+  const session = await signIn(h, "1");
+  const junk = "tracker=%E0%A4%A; other=%";
+
+  // Someone else's broken cookie alongside a good session: still signed in.
+  for (const url of ["/", "/new"]) {
+    const res = await h.instance.inject({ method: "GET", url, headers: { cookie: `${junk}; ${session}` } });
+    assert.equal(res.statusCode, 200, url);
+    assert.ok(!res.body.includes('"view":"login"'), `${url} should still be signed in`);
+  }
+  const api = await h.instance.inject({ method: "GET", url: "/api/games/wyrm-lantern-ward", headers: { cookie: `${session}; ${junk}` } });
+  assert.equal(api.statusCode, 404, "reached the route, signed in");
+
+  // A broken session cookie itself just means signed out.
+  const bad = await h.instance.inject({ method: "GET", url: "/", headers: { cookie: `${SESSION_COOKIE}=%E0%A4%A` } });
+  assert.equal(bad.statusCode, 200);
+  assert.ok(bad.body.includes('"view":"login"'));
+});

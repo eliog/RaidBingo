@@ -4,6 +4,7 @@ import {
   derivePid, newSessionToken, hashSessionToken,
   signState, verifyState, safeReturnTo, STATE_MAX_AGE_MS,
 } from "../server/identity.ts";
+import { parseCookies } from "../server/auth.ts";
 
 const SECRET = "a".repeat(64);
 const OTHER = "b".repeat(64);
@@ -93,4 +94,10 @@ test("a state only verifies with the nonce it was issued with (#10)", () => {
   for (const other of ["", "someone-elses-nonce", NONCE + "x", NONCE.slice(1)]) {
     assert.equal(verifyState(state, SECRET, now, other), null, JSON.stringify(other));
   }
+});
+
+test("parseCookies never throws, and keeps the good cookies around a bad one (#16)", () => {
+  assert.deepEqual(parseCookies("a=1; b=%E0%A4%A; c=hello%20there; d=%"), { a: "1", c: "hello there" });
+  assert.deepEqual(parseCookies(undefined), {});
+  assert.deepEqual(parseCookies("=x; ;novalue; e=2"), { e: "2" });
 });

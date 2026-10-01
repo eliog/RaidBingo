@@ -25,7 +25,14 @@ export function parseCookies(header: string | undefined): Record<string, string>
     if (eq < 1) continue;
     const k = part.slice(0, eq).trim();
     const v = part.slice(eq + 1).trim();
-    if (k !== "") out[k] = decodeURIComponent(v);
+    if (k === "") continue;
+    // Any cookie on the domain arrives here, not just ours, and one bad %
+    // escape used to throw — a 500 on every page until the cookie was cleared.
+    try {
+      out[k] = decodeURIComponent(v);
+    } catch {
+      // Skip just that one.
+    }
   }
   return out;
 }
