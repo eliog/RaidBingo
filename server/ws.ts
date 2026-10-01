@@ -19,6 +19,9 @@ import { hashSessionToken } from "./identity.ts";
 import { bestLineOf } from "../shared/board.ts";
 import type { MessageView } from "./game-service.ts";
 
+/** Bytes. Anything larger is refused before it is buffered. */
+export const MAX_CLIENT_FRAME = 1024;
+
 export interface LivePayload {
   type: "state";
   called: [number, number][];
@@ -42,7 +45,10 @@ export class GameHub {
   }
 
   attach(httpServer: Server): void {
-    const wss = new WebSocketServer({ noServer: true });
+    // The socket is push-only: a client has nothing to say. Without a cap, ws
+    // buffers a whole incoming frame (100 MiB by default) before it could be
+    // ignored, which is enough to run the one machine out of memory.
+    const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_CLIENT_FRAME });
     this.#server = wss;
 
     httpServer.on("upgrade", (request, socket, head) => {
@@ -88,6 +94,8 @@ export class GameHub {
       this.#rooms.set(gameId, room);
     }
     room.add(ws);
+    // Talking is not part of the protocol, so any frame at all ends the socket.
+    ws.on("message", () => ws.close(1008, "push only"));
     ws.on("close", () => {
       room.delete(ws);
       if (room.size === 0) this.#rooms.delete(gameId);

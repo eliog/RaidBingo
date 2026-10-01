@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WebSocket } from "ws";
 import { buildApp, setHub } from "../server/app.ts";
-import { GameHub } from "../server/ws.ts";
+import { GameHub, MAX_CLIENT_FRAME } from "../server/ws.ts";
 import { createRepository, openDatabase } from "../server/db.ts";
 import { GameService } from "../server/game-service.ts";
 import { newSessionToken, hashSessionToken, SESSION_MS } from "../server/identity.ts";
@@ -285,5 +285,41 @@ test("a socket from a foreign origin is refused; the site's own origin is accept
     const ours = h.socket(created.value, owner, { origin: "https://raidbingo.test" });
     await ours.opened();
     ours.close();
+  } finally { await h.stop(); }
+});
+
+test("a client that sends anything is cut off, and an oversized frame is never buffered (#4)", async () => {
+  const h = await live();
+  try {
+    const owner = await h.signIn("owner-pid");
+    const created = await h.service.createGame("owner-pid", "Tuesday BT run", items());
+    assert.ok(created.ok);
+    await h.service.joinGame("owner-pid", created.value, "Felwarden");
+
+    const closedWith = (sock: ReturnType<typeof h.socket>) =>
+      new Promise<number>((res) => sock.ws.once("close", (code) => res(code)));
+
+    // Past the cap: refused as too big before the frame is held in memory.
+    const big = h.socket(created.value, owner);
+    await big.opened();
+    const bigClosed = closedWith(big);
+    big.ws.send(Buffer.alloc(MAX_CLIENT_FRAME + 1));
+    assert.equal(await bigClosed, 1009);
+
+    // Under the cap: still closed, because the protocol is push-only.
+    const small = h.socket(created.value, owner);
+    await small.opened();
+    const smallClosed = closedWith(small);
+    small.ws.send("hello");
+    assert.equal(await smallClosed, 1008);
+
+    // A well-behaved viewer is unaffected.
+    const quiet = h.socket(created.value, owner);
+    await quiet.until((m) => m["type"] === "state");
+    await h.service.call("owner-pid", created.value, 0);
+    h.hub.push(created.value);
+    const after = await quiet.until((m) => m["type"] === "state" && (m["called"] as unknown[]).length === 1);
+    assert.equal((after["called"] as unknown[]).length, 1);
+    quiet.close();
   } finally { await h.stop(); }
 });
