@@ -790,3 +790,82 @@ test("every page and api response says no-store; static files and the preview ke
   assert.equal(png.statusCode, 200);
   assert.equal(png.headers["cache-control"], "public, max-age=300");
 });
+
+/** The page's state block, parsed the way the client parses it. */
+function stateOf(html: string): Record<string, unknown> {
+  const m = /<script type="application\/json" id="rb-state">([\s\S]*?)<\/script>/.exec(html);
+  assert.ok(m, "no rb-state block");
+  return JSON.parse(m[1] as string) as Record<string, unknown>;
+}
+
+/** Every <script> tag in the page: only external files and the data block are allowed. */
+function inlineScripts(html: string): string[] {
+  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)]
+    .filter(([, attrs, body]) => !/\bsrc=/.test(attrs as string) && !/type="application\/json"/.test(attrs as string) && (body as string).trim() !== "")
+    .map(([tag]) => tag as string);
+}
+
+test("pages carry their state as a JSON data block, with no executable inline script (#26)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie },
+    payload: { title: "Tuesday BT run", items: items() } });
+  const id = (made.json() as { id: string }).id;
+  const pages: [string, string, boolean, string][] = [
+    ["signed-out root", "/", false, "login"],
+    ["signed-out invite", `/g/${id}`, false, "login"],
+    ["lobby", "/", true, "lobby"],
+    ["new game", "/new", true, "create"],
+    ["join", `/g/${id}`, true, "join"],
+  ];
+  for (const [what, url, signed, view] of pages) {
+    const res = await h.instance.inject({ method: "GET", url, headers: signed ? { cookie } : {} });
+    assert.equal(res.statusCode, 200, what);
+    assert.equal(stateOf(res.body)["view"], view, what);
+    assert.deepEqual(inlineScripts(res.body), [], `${what} has an executable inline script`);
+    assert.ok(!res.body.includes("window.__RB__"), what);
+  }
+  // After joining, the board page too.
+  await h.instance.inject({ method: "POST", url: `/api/games/${id}/join`, headers: { cookie }, payload: { charName: "Felwarden" } });
+  const board = await h.instance.inject({ method: "GET", url: `/g/${id}`, headers: { cookie } });
+  assert.equal(stateOf(board.body)["view"], "board");
+  assert.deepEqual(inlineScripts(board.body), []);
+});
+
+test("hostile text cannot break out of the state block (#26)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  const nasty = "</script><script>alert(1)</script><!--";
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie },
+    payload: { title: "a</script>b<!--c", items: items().map((s, i) => (i === 0 ? nasty.slice(0, 40) : s)) } });
+  assert.equal(made.statusCode, 200);
+  const id = (made.json() as { id: string }).id;
+  await h.instance.inject({ method: "POST", url: `/api/games/${id}/join`, headers: { cookie }, payload: { charName: "</script>x" } });
+
+  const res = await h.instance.inject({ method: "GET", url: `/g/${id}`, headers: { cookie } });
+  const state = stateOf(res.body) as { game: { title: string; items: string[]; charName: string } };
+  assert.equal(state.game.title, "a</script>b<!--c", "round-trips exactly");
+  assert.equal(state.game.items[0], nasty.slice(0, 40));
+  assert.equal(state.game.charName, "</script>x");
+  assert.deepEqual(inlineScripts(res.body), [], "nothing escaped into a runnable script");
+  assert.equal((res.body.match(/<script\b/g) ?? []).length, 2, "just the data block and the module");
+});
+
+test("the policy no longer lets inline scripts run (#26)", async () => {
+  const h = app();
+  const res = await h.instance.inject({ method: "GET", url: "/" });
+  const csp = String(res.headers["content-security-policy"]);
+  const scriptSrc = /script-src ([^;]*)/.exec(csp)?.[1] ?? "";
+  assert.equal(scriptSrc.trim(), "'self'");
+  assert.ok(!/'unsafe-eval'/.test(csp));
+  assert.match(csp, /object-src 'none'/);
+});
+
+test("the client reads the state block, not a global (#26)", async () => {
+  const h = app();
+  const client = await h.instance.inject({ method: "GET", url: "/assets/app.js" });
+  assert.match(client.body, /document\.getElementById\("rb-state"\)/);
+  assert.ok(!client.body.includes("__RB__"));
+  // And no inline handlers baked into markup the client builds.
+  assert.ok(!/\bon[a-z]+="/i.test(client.body), "an inline on…= attribute would be blocked by the policy");
+});

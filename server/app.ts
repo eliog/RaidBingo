@@ -61,11 +61,13 @@ export function buildApp(deps: Deps): FastifyInstance {
     reply.header("referrer-policy", "strict-origin-when-cross-origin");
     reply.header("x-frame-options", "DENY");
     reply.header("permissions-policy", "geolocation=(), microphone=(), camera=()");
-    // The only third party is Google Fonts. Everything else is same-origin,
-    // and there is no inline script beyond the state blob the page embeds.
+    // The only third party is Google Fonts. Everything else is same-origin.
+    // No inline script may run — the page state is a JSON data block, not a
+    // script — so an injected <script> or on…= handler would be inert.
+    // style-src keeps 'unsafe-inline' for style attributes; styles can't run code.
     reply.header(
       "content-security-policy",
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
+      "default-src 'self'; script-src 'self'; object-src 'none'; " +
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
         "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; " +
         "frame-ancestors 'none'; base-uri 'none'; form-action 'self'",

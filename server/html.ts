@@ -30,7 +30,7 @@ export interface LayoutOptions {
   body: string;
   /** Extra tags for <head> — already-escaped markup. */
   head?: string | undefined;
-  /** Serialised state for the client, exposed as window.__RB__. */
+  /** Serialised state for the client, in the `rb-state` JSON block. */
   state?: unknown;
   module?: string | undefined;
   /** The signed-in player's choice. Absent means follow the device. */
@@ -58,7 +58,9 @@ function themeHead(theme: Theme): { attr: string; meta: string } {
 export function layout(opts: LayoutOptions): string {
   const state = opts.state === undefined
     ? ""
-    : `<script>window.__RB__=${jsonForScript(opts.state)};</script>`;
+    // A data block, never executed, so the CSP can refuse every inline script.
+    // jsonForScript keeps the content from closing the tag.
+    : `<script type="application/json" id="rb-state">${jsonForScript(opts.state)}</script>`;
   const mod = opts.module === undefined
     ? ""
     : `<script type="module" src="/assets/${esc(opts.module)}"></script>`;

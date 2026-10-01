@@ -7,7 +7,12 @@ import { checkItems, validateCharName, ITEM_MAX, ITEM_SOFT_MAX, CHAT_MAX } from 
 import { timeline } from "/shared/timeline.js";
 import { apiRequest } from "/shared/request.js";
 
-const S = window.__RB__ ?? { view: "login", returnTo: "/" };
+// The server embeds the page state as a JSON data block rather than a script,
+// so the CSP can forbid inline scripts outright.
+const S = (() => {
+  const el = document.getElementById("rb-state");
+  try { return el ? JSON.parse(el.textContent) : null; } catch { return null; }
+})() ?? { view: "login", returnTo: "/" };
 const root = document.getElementById("app");
 
 /* ------------------------------------------------------------------ dom */
