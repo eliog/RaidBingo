@@ -53,6 +53,10 @@ export function buildApp(deps: Deps): FastifyInstance {
     if (base.protocol === "https:") {
       reply.header("strict-transport-security", "max-age=31536000; includeSubDomains");
     }
+    // Pages and api answers are per player — a lobby, a board, chat — so
+    // nothing may keep a copy: no shared cache, and no back button showing a
+    // board after logout. The few public files set their own and keep it.
+    if (!reply.hasHeader("cache-control")) reply.header("cache-control", "no-store");
     reply.header("x-content-type-options", "nosniff");
     reply.header("referrer-policy", "strict-origin-when-cross-origin");
     reply.header("x-frame-options", "DENY");

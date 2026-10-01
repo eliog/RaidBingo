@@ -750,3 +750,43 @@ test("logging out from the site itself still works, from a form or a script (#23
     assert.equal(await signedIn(h, cookie), false);
   }
 });
+
+test("every page and api response says no-store; static files and the preview keep their caching (#24)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie },
+    payload: { title: "Tuesday BT run", items: items() } });
+  const id = (made.json() as { id: string }).id;
+  const get = (url: string, signedIn = true) =>
+    h.instance.inject({ method: "GET", url, headers: signedIn ? { cookie } : {} });
+
+  const personal = [
+    ["created game (api)", made],
+    ["lobby", await get("/")],
+    ["new game", await get("/new")],
+    ["board / join", await get(`/g/${id}`)],
+    ["signed-out root", await get("/", false)],
+    ["signed-out invite", await get(`/g/${id}`, false)],
+    ["no such game page", await get("/g/wyrm-lantern-ward")],
+    ["malformed id page", await get("/g/NOT_AN_ID")],
+    ["game api", await get(`/api/games/${id}`)],
+    ["chat api", await get(`/api/games/${id}/chat`)],
+    ["api 404", await get("/api/games/wyrm-lantern-ward")],
+    ["api 401", await get(`/api/games/${id}`, false)],
+    ["api 400", await h.instance.inject({ method: "POST", url: `/api/games/${id}/call`, headers: { cookie }, payload: { item: "x" } })],
+    ["api 415", await h.instance.inject({ method: "POST", url: `/api/games/${id}/call`, headers: { cookie } })],
+    ["theme api", await h.instance.inject({ method: "POST", url: "/api/me/theme", headers: { cookie }, payload: { theme: "dark" } })],
+    ["login redirect", await get("/auth/login?returnTo=%2F", false)],
+    ["logout", await h.instance.inject({ method: "POST", url: "/auth/logout", headers: { cookie, "content-type": "application/x-www-form-urlencoded" }, payload: "" })],
+  ] as const;
+  for (const [what, res] of personal) {
+    assert.equal(res.headers["cache-control"], "no-store", `${what} (${res.statusCode})`);
+  }
+
+  // Public, cacheable on purpose — must not be downgraded.
+  assert.equal((await get("/assets/app.css", false)).headers["cache-control"], "public, max-age=60");
+  assert.equal((await get("/shared/board.js", false)).headers["cache-control"], "no-cache");
+  const png = await get(`/og/${id}.png`, false);
+  assert.equal(png.statusCode, 200);
+  assert.equal(png.headers["cache-control"], "public, max-age=300");
+});
