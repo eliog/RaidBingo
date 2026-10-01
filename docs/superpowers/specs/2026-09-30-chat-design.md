@@ -186,10 +186,12 @@ place on phones.
 | Cross-site socket | Origin check on upgrade, on top of SameSite=Lax |
 | Leak through previews or logs | Chat stays off the Open Graph preview; message text is never logged |
 
-**Follow-up, out of scope here:** a Content-Security-Policy header. The client
-sets inline `style` attributes throughout and the bootstrap script is inline,
-so a strict policy needs a nonce and either a style refactor or
-`'unsafe-inline'` for styles only. Worth doing as its own change.
+A Content-Security-Policy header is already set in `server/app.ts`, so an
+`innerHTML` slip in a future change would still be blocked from loading a
+foreign script. Its `script-src` allows `'unsafe-inline'` for the embedded
+state blob, which also permits inline event handlers in injected markup.
+**Follow-up, out of scope here:** replace that with a per-request nonce on the
+bootstrap script. Worth doing as its own change.
 
 ## Testing
 
