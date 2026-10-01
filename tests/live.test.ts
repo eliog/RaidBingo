@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WebSocket } from "ws";
 import { buildApp, setHub } from "../server/app.ts";
-import { GameHub, MAX_CLIENT_FRAME } from "../server/ws.ts";
+import { GameHub, MAX_CLIENT_FRAME, MAX_SOCKETS_PER_PLAYER } from "../server/ws.ts";
 import { createRepository, openDatabase } from "../server/db.ts";
 import { GameService } from "../server/game-service.ts";
 import { newSessionToken, hashSessionToken, SESSION_MS } from "../server/identity.ts";
@@ -62,9 +62,8 @@ async function live() {
         return this.until(() => true, timeoutMs);
       },
       /**
-       * Waits for a message that matches. Every connect re-pushes to the whole
-       * room, so a second viewer joining sends the first one another frame —
-       * "the next message" is not the same thing as "the one I am waiting for".
+       * Waits for a message that matches — "the next message" is not always
+       * the one being waited for, e.g. when a chat frame lands first.
        */
       until(match: (m: Record<string, unknown>) => boolean, timeoutMs = 4000): Promise<Record<string, unknown>> {
         const hit = seen.findIndex(match);
@@ -248,8 +247,8 @@ test("a chat message reaches both sockets as one chat frame, with no new state f
     await a.until((m) => m["type"] === "state");
     const b = h.socket(gameId, player);
     await b.opened();
-    // b connecting re-pushes state to the whole room; let both settle.
-    await Promise.all([a.until((m) => m["type"] === "state"), b.until((m) => m["type"] === "state")]);
+    // Only b gets a state frame for b connecting (#12).
+    await b.until((m) => m["type"] === "state");
 
     const chat = (m: Record<string, unknown>) => m["type"] === "chat";
     const both = Promise.all([a.until(chat), b.until(chat)]);
@@ -351,5 +350,41 @@ test("a call and an undo each reach a viewer as exactly one state frame (#7)", a
       assert.deepEqual(frames, [expect], `${path} should push once`);
     }
     viewer.close();
+  } finally { await h.stop(); }
+});
+
+test("a connect sends state to the newcomer only, and a fifth socket closes the oldest (#12)", async () => {
+  const h = await live();
+  try {
+    const owner = await h.signIn("owner-pid");
+    const player = await h.signIn("player-pid");
+    const created = await h.service.createGame("owner-pid", "Tuesday BT run", items());
+    assert.ok(created.ok);
+    const gameId = created.value;
+    await h.service.joinGame("owner-pid", gameId, "Felwarden");
+    await h.service.joinGame("player-pid", gameId, "Thalgrim");
+
+    const watcher = h.socket(gameId, owner);
+    await watcher.until((m) => m["type"] === "state");
+    let extra = 0;
+    watcher.ws.on("message", () => { extra++; });
+
+    // The player reconnects in a loop; the watcher hears none of it.
+    const socks = [];
+    for (let i = 0; i < MAX_SOCKETS_PER_PLAYER + 3; i++) {
+      const s = h.socket(gameId, player);
+      await s.until((m) => m["type"] === "state");
+      socks.push(s);
+    }
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(extra, 0, "another player's connects pushed frames to the watcher");
+
+    // Only the newest few of the player's sockets are still open.
+    const open = socks.filter((s) => s.ws.readyState === s.ws.OPEN).length;
+    assert.equal(open, MAX_SOCKETS_PER_PLAYER);
+    assert.equal(socks.at(-1)!.ws.readyState, socks.at(-1)!.ws.OPEN, "the newest survives");
+    assert.equal(watcher.ws.readyState, watcher.ws.OPEN, "another player's socket is untouched");
+    for (const s of socks) s.close();
+    watcher.close();
   } finally { await h.stop(); }
 });

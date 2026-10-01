@@ -22,6 +22,9 @@ import type { MessageView } from "./game-service.ts";
 /** Bytes. Anything larger is refused before it is buffered. */
 export const MAX_CLIENT_FRAME = 1024;
 
+/** Open sockets one player may hold to one game; another closes the oldest. */
+export const MAX_SOCKETS_PER_PLAYER = 4;
+
 export interface LivePayload {
   type: "state";
   called: [number, number][];
@@ -34,6 +37,8 @@ export interface LivePayload {
 
 export class GameHub {
   readonly #rooms = new Map<string, Set<WebSocket>>();
+  /** Whose each socket is. Weak, so a closed socket takes its entry with it. */
+  readonly #owners = new WeakMap<WebSocket, string>();
   readonly #deps: Deps;
   /** The only Origin a browser handshake may carry. */
   readonly #origin: string;
@@ -80,19 +85,31 @@ export class GameHub {
         if (member === null) return socket.destroy();
 
         wss.handleUpgrade(request, socket, head, (ws) => {
-          this.#join(gameId, ws);
-          void this.push(gameId);
+          this.#join(gameId, session.pid, ws);
+          // Only the newcomer needs the current state. Pushing to the room
+          // let one player redraw everyone's board by reconnecting in a loop.
+          void this.#state(gameId).then((text) => {
+            if (text !== null && ws.readyState === ws.OPEN) ws.send(text);
+          });
         });
       })().catch(() => socket.destroy());
     });
   }
 
-  #join(gameId: string, ws: WebSocket): void {
+  #join(gameId: string, pid: string, ws: WebSocket): void {
     let room = this.#rooms.get(gameId);
     if (room === undefined) {
       room = new Set();
       this.#rooms.set(gameId, room);
     }
+    // A phone and a laptop and a stale tab is normal; dozens is not. Sets
+    // iterate in insertion order, so the first match is the oldest.
+    const theirs = [...room].filter((other) => this.#owners.get(other) === pid);
+    for (const stale of theirs.slice(0, Math.max(0, theirs.length - MAX_SOCKETS_PER_PLAYER + 1))) {
+      room.delete(stale);
+      stale.close(1008, "too many tabs");
+    }
+    this.#owners.set(ws, pid);
     room.add(ws);
     // Talking is not part of the protocol, so any frame at all ends the socket.
     ws.on("message", () => ws.close(1008, "push only"));
@@ -107,9 +124,14 @@ export class GameHub {
   async push(gameId: string): Promise<void> {
     const room = this.#rooms.get(gameId);
     if (room === undefined || room.size === 0) return;
+    const text = await this.#state(gameId);
+    if (text !== null) this.#broadcast(gameId, text);
+  }
 
+  /** The state frame, serialised once for however many sockets get it. */
+  async #state(gameId: string): Promise<string | null> {
     const game = await this.#deps.repo.getGame(gameId);
-    if (game === null) return;
+    if (game === null) return null;
     const calls = await this.#deps.repo.callsFor(gameId);
     const called = new Set(calls.keys());
     const roster = await this.#deps.repo.rosterFor(gameId);
@@ -133,8 +155,7 @@ export class GameHub {
         }),
       closed: game.closedAt !== null,
     };
-
-    this.#broadcast(gameId, JSON.stringify(payload));
+    return JSON.stringify(payload);
   }
 
   /** Serialised once by the caller, sent to every open socket in the room. */
