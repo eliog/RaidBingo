@@ -566,3 +566,33 @@ test("the client gets its request builder from /shared, and uses it (#19)", asyn
   assert.match(client.body, /fetch\(path, apiRequest\(body, method\)\)/);
   assert.equal(client.body.match(/\bfetch\(/g)?.length, 1, "every request goes through api()");
 });
+
+test("call and undo accept only an integer square, and garbage calls nothing (#15)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie },
+    payload: { title: "Tuesday BT run", items: items() } });
+  const id = (made.json() as { id: string }).id;
+  const send = (path: "call" | "undo", body: unknown) => h.instance.inject({
+    method: "POST", url: `/api/games/${id}/${path}`, headers: { cookie, "content-type": "application/json" },
+    payload: JSON.stringify(body),
+  });
+
+  // Each of these used to coerce to a square: null, "", false and [] to 0, "5" and [5] to 5.
+  const garbage = [{ item: null }, { item: "" }, { item: false }, { item: [] }, { item: "5" }, { item: [5] },
+    { item: true }, { item: {} }, {}, { item: 1.5 }, { item: -1 }, { item: 24 }, { item: 1e9 }];
+  for (const path of ["call", "undo"] as const) {
+    for (const body of garbage) {
+      const res = await send(path, body);
+      assert.equal(res.statusCode, 400, `${path} ${JSON.stringify(body)}`);
+      assert.equal((res.json() as { error: { code: string } }).error.code, "invalid");
+    }
+  }
+  assert.equal((await h.repo.callsFor(id)).size, 0, "nothing was called");
+
+  // The real thing still works, at both ends of the board.
+  for (const item of [0, 23]) assert.equal((await send("call", { item })).statusCode, 200);
+  assert.deepEqual([...(await h.repo.callsFor(id)).keys()].sort((a, b) => a - b), [0, 23]);
+  assert.equal((await send("undo", { item: 0 })).statusCode, 200);
+  assert.deepEqual([...(await h.repo.callsFor(id)).keys()], [23]);
+});

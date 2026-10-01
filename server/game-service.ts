@@ -13,6 +13,9 @@ import {
 import type { ChatMessage } from "../shared/timeline.ts";
 import { RateLimiter } from "./rate-limit.ts";
 
+/** An index into the 24 items. Call and undo both check it the same way. */
+const isSquare = (i: number): boolean => Number.isInteger(i) && i >= 0 && i < ITEM_COUNT;
+
 export const IDLE_CLOSE_MS = 8 * 60 * 60 * 1000;
 export const GAMES_PER_DAY = 5;
 export const MAX_PREVIOUS_SETS = 8;
@@ -324,9 +327,7 @@ export class GameService {
       return err("forbidden", "You're not a caller for this game.");
     }
     if (game.closedAt !== null) return err("closed", "That game is closed. No more calls.");
-    if (!Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex >= ITEM_COUNT) {
-      return err("invalid", "That square isn't on this board.");
-    }
+    if (!isSquare(itemIndex)) return err("invalid", "That square isn't on this board.");
     // Idempotent by primary key, so the reflex double-tap is safe.
     const now = this.#clock.now();
     await this.#repo.addCall(gameId, itemIndex, now);
@@ -343,6 +344,7 @@ export class GameService {
       return err("forbidden", "You're not a caller for this game.");
     }
     if (game.closedAt !== null) return err("closed", "That game is closed.");
+    if (!isSquare(itemIndex)) return err("invalid", "That square isn't on this board.");
     await this.#repo.removeCall(gameId, itemIndex);
     // The undo itself is activity. Measured from the calls left, it would
     // rewind the idle clock and could close a game that was busy a minute ago.

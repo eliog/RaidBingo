@@ -34,6 +34,18 @@ function cursor(raw: unknown): number | null | undefined {
   return Number.isSafeInteger(n) ? n : null;
 }
 
+/**
+ * A JSON integer, and nothing that merely converts to one: Number() turns
+ * null, "", false and [] into 0, which would call the first square. Range
+ * is the service's to check.
+ */
+function squareFrom(body: unknown): number | null {
+  const item = (body as { item?: unknown } | null)?.item;
+  return typeof item === "number" && Number.isInteger(item) ? item : null;
+}
+
+const NOT_A_SQUARE: ServiceError = { code: "invalid", message: "That square isn't on this board." };
+
 function fail(reply: FastifyReply, error: ServiceError): FastifyReply {
   return reply.code(STATUS[error.code]).send({ error });
 }
@@ -290,7 +302,8 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
     async (request, reply) => {
       const pid = await requirePid(request, reply);
       if (pid === null) return reply;
-      const item = Number((request.body ?? {}).item);
+      const item = squareFrom(request.body);
+      if (item === null) return fail(reply, NOT_A_SQUARE);
       const called = await service.call(pid, request.params.id, item);
       if (!called.ok) return fail(reply, called.error);
       notifyGame(request.params.id);
@@ -304,7 +317,8 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
     async (request, reply) => {
       const pid = await requirePid(request, reply);
       if (pid === null) return reply;
-      const item = Number((request.body ?? {}).item);
+      const item = squareFrom(request.body);
+      if (item === null) return fail(reply, NOT_A_SQUARE);
       const undone = await service.undo(pid, request.params.id, item);
       if (!undone.ok) return fail(reply, undone.error);
       notifyGame(request.params.id);

@@ -504,3 +504,14 @@ test("only the owner can rename or close, open or not (#14)", async () => {
   const missing = await h.service.closeGame(OWNER, "no-such-game");
   assert.equal(missing.ok ? "closed" : missing.error.code, "not_found");
 });
+
+test("undo checks the square the same way call does (#15)", async () => {
+  const h = await withGame();
+  for (const bad of [Number.NaN, -1, 24, 2.5, Number.POSITIVE_INFINITY]) {
+    const r = await h.service.undo(OWNER, h.gameId, bad);
+    assert.equal(r.ok ? "undone" : r.error.code, "invalid", String(bad));
+  }
+  // Checked after the permission and closed checks, like call.
+  const stranger = await h.service.undo(ALICE, h.gameId, 99);
+  assert.equal(stranger.ok ? "undone" : stranger.error.code, "forbidden");
+});
