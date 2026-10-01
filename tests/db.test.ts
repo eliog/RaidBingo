@@ -183,7 +183,7 @@ test("a version 3 database gains a theme, and existing players follow their devi
   old.close();
 
   const db = openDatabase(file);
-  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 5);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 6);
   assert.equal((db.prepare("SELECT theme FROM players WHERE pid = 'p'").get() as { theme: string }).theme, "auto");
   db.close();
   // Safe to run twice.
@@ -214,7 +214,7 @@ test("a version 4 database has its name keys recomputed, and a clash keeps both 
   old.close();
 
   const db = openDatabase(file);
-  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 5);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 6);
   const key = (pid: string) => (db.prepare("SELECT char_name_key AS k FROM game_players WHERE pid = ?").get(pid) as { k: string }).k;
   assert.equal(key("real"), "thalgrim");
   assert.equal(key("wide"), "bonk");
@@ -222,4 +222,43 @@ test("a version 4 database has its name keys recomputed, and a clash keeps both 
   assert.equal((db.prepare("SELECT COUNT(*) AS n FROM game_players").get() as { n: number }).n, 3);
   db.close();
   openDatabase(file).close();   // safe to run twice
+});
+
+test("a version 5 database gets an idle clock that matches what idleness was measured by (#13)", () => {
+  const file = `/tmp/rb-migrate6-${process.pid}-${Date.now()}.db`;
+  const old = new DatabaseSync(file);
+  old.exec(`CREATE TABLE games (id TEXT PRIMARY KEY, title TEXT NOT NULL, owner_pid TEXT NOT NULL,
+      items_json TEXT NOT NULL, items_frozen INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL, closed_at INTEGER, chat_seq INTEGER NOT NULL DEFAULT 0) STRICT;
+    CREATE TABLE calls (game_id TEXT NOT NULL, item_idx INTEGER NOT NULL, called_at INTEGER NOT NULL,
+      PRIMARY KEY (game_id, item_idx)) STRICT;
+    PRAGMA user_version = 5;`);
+  const game = old.prepare("INSERT INTO games VALUES (?, 'x', 'o', '[]', 1, ?, NULL, 0)");
+  game.run("quiet-new-game", T0);
+  game.run("busy-old-game", T0);
+  const call = old.prepare("INSERT INTO calls VALUES (?, ?, ?)");
+  call.run("busy-old-game", 1, T0 + 1000);
+  call.run("busy-old-game", 2, T0 + 5000);
+  old.close();
+
+  const db = openDatabase(file);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 6);
+  const at = (id: string) => (db.prepare("SELECT last_activity_at AS t FROM games WHERE id = ?").get(id) as { t: number }).t;
+  assert.equal(at("quiet-new-game"), T0, "no calls: the creation time");
+  assert.equal(at("busy-old-game"), T0 + 5000, "the latest call");
+  db.close();
+  openDatabase(file).close();
+  const again = openDatabase(file);
+  assert.equal((again.prepare("SELECT last_activity_at AS t FROM games WHERE id = 'busy-old-game'").get() as { t: number }).t, T0 + 5000);
+  again.close();
+});
+
+test("the idle clock only moves forward (#13)", async () => {
+  const repo = createRepository(openDatabase(":memory:"));
+  await repo.upsertPlayer("o", T0);
+  await repo.createGame({ id: "a-b-c", title: "x", ownerPid: "o", items: items(), itemsFrozen: false, createdAt: T0, closedAt: null });
+  assert.equal((await repo.getGame("a-b-c"))?.lastActivityAt, T0);
+  await repo.touchGame("a-b-c", T0 + 500);
+  await repo.touchGame("a-b-c", T0 + 100);
+  assert.equal((await repo.getGame("a-b-c"))?.lastActivityAt, T0 + 500);
 });

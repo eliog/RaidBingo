@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS games (
   items_frozen INTEGER NOT NULL DEFAULT 0,
   created_at   INTEGER NOT NULL,
   closed_at    INTEGER,
-  chat_seq     INTEGER NOT NULL DEFAULT 0
+  chat_seq     INTEGER NOT NULL DEFAULT 0,
+  last_activity_at INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 CREATE INDEX IF NOT EXISTS games_owner ON games(owner_pid, created_at DESC);
 
@@ -87,7 +88,7 @@ CREATE TABLE IF NOT EXISTS messages (
 ) STRICT;
 `;
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 /**
  * Schema changes have to reach databases that already hold real games, so
@@ -133,6 +134,18 @@ function migrate(db: DatabaseSync): void {
     for (const r of rows) rekey.run(charNameKey(String(r["char_name"])), String(r["game_id"]), String(r["pid"]));
   }
 
+  // The idle clock gets its own column (#13). Backfilled from what idleness
+  // was measured by until now, so no existing game closes or reopens.
+  if (from < 6) {
+    const columns = db.prepare("PRAGMA table_info(games)").all() as { name?: unknown }[];
+    if (!columns.some((c) => String(c["name"]) === "last_activity_at")) {
+      db.exec("ALTER TABLE games ADD COLUMN last_activity_at INTEGER NOT NULL DEFAULT 0");
+    }
+    db.exec(`UPDATE games SET last_activity_at = MAX(created_at,
+      COALESCE((SELECT MAX(called_at) FROM calls WHERE calls.game_id = games.id), 0))
+      WHERE last_activity_at = 0`);
+  }
+
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -170,6 +183,7 @@ const toGame = (r: Row): GameRow => ({
   createdAt: num(r["created_at"]),
   closedAt: maybeNum(r["closed_at"]),
   chatSeq: num(r["chat_seq"]),
+  lastActivityAt: num(r["last_activity_at"]),
 });
 
 const toMessage = (r: Row): MessageRow => ({
@@ -212,13 +226,14 @@ export function createRepository(db: DatabaseSync): Repository {
     deleteSession: db.prepare(`DELETE FROM sessions WHERE token_hash = ?`),
 
     createGame: db.prepare(
-      `INSERT INTO games (id, title, owner_pid, items_json, items_frozen, created_at, closed_at)
-       VALUES (?, ?, ?, ?, ?, ?, NULL)`),
+      `INSERT INTO games (id, title, owner_pid, items_json, items_frozen, created_at, closed_at, last_activity_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`),
     getGame: db.prepare(`SELECT * FROM games WHERE id = ?`),
     updateItems: db.prepare(`UPDATE games SET items_json = ? WHERE id = ? AND items_frozen = 0`),
     freezeItems: db.prepare(`UPDATE games SET items_frozen = 1 WHERE id = ?`),
     setTitle: db.prepare(`UPDATE games SET title = ? WHERE id = ?`),
     closeGame: db.prepare(`UPDATE games SET closed_at = ? WHERE id = ? AND closed_at IS NULL`),
+    touchGame: db.prepare(`UPDATE games SET last_activity_at = MAX(last_activity_at, ?) WHERE id = ?`),
     gamesForPlayer: db.prepare(
       `SELECT g.* FROM games g
        JOIN game_players gp ON gp.game_id = g.id
@@ -303,7 +318,7 @@ export function createRepository(db: DatabaseSync): Repository {
     async createGame(row) {
       q.createGame.run(
         row.id, row.title, row.ownerPid, JSON.stringify(row.items),
-        row.itemsFrozen ? 1 : 0, row.createdAt,
+        row.itemsFrozen ? 1 : 0, row.createdAt, row.createdAt,
       );
     },
     async getGame(id) {
@@ -321,6 +336,9 @@ export function createRepository(db: DatabaseSync): Repository {
     },
     async closeGame(id, now) {
       q.closeGame.run(now, id);
+    },
+    async touchGame(id, at) {
+      q.touchGame.run(at, id);
     },
     async gamesForPlayer(pid) {
       return (q.gamesForPlayer.all(pid) as Row[]).map(toGame);

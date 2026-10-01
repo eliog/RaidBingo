@@ -122,8 +122,7 @@ export class GameService {
     if (game === null) return null;
     if (game.closedAt !== null) return game;
 
-    const calls = await this.#repo.callsFor(id);
-    const last = Math.max(game.createdAt, ...calls.values());
+    const last = game.lastActivityAt;
     if (this.#clock.now() - last > IDLE_CLOSE_MS) {
       await this.#repo.closeGame(id, last + IDLE_CLOSE_MS);
       return await this.#repo.getGame(id);
@@ -325,6 +324,7 @@ export class GameService {
     // Idempotent by primary key, so the reflex double-tap is safe.
     const now = this.#clock.now();
     await this.#repo.addCall(gameId, itemIndex, now);
+    await this.#repo.touchGame(gameId, now);
     // A bingo's time is exactly the time of the call that completed the line;
     // the chat timeline orders the call first on that tie.
     return ok({ winners: await this.#reconcileBingos(gameId, now) });
@@ -338,6 +338,9 @@ export class GameService {
     }
     if (game.closedAt !== null) return err("closed", "That game is closed.");
     await this.#repo.removeCall(gameId, itemIndex);
+    // The undo itself is activity. Measured from the calls left, it would
+    // rewind the idle clock and could close a game that was busy a minute ago.
+    await this.#repo.touchGame(gameId, this.#clock.now());
     // An undo means it never happened, so any bingo that rested on this call
     // goes with it.
     await this.#reconcileBingos(gameId);
@@ -350,7 +353,7 @@ export class GameService {
    * not spend one of the five, and again atomically inside the insert, which
    * catches two posts racing at the ceiling.
    *
-   * Posting is not activity: the idle clock still runs on calls alone.
+   * Posting is not activity: the idle clock still runs on calls and undos alone.
    */
   async postMessage(gameId: string, pid: string, raw: unknown): Promise<Result<MessageView>> {
     const game = await this.#liveGame(gameId);

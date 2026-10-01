@@ -48,7 +48,7 @@ so the stream reads as reactions to what happened. Spec:
 - Single-line, 300 UTF-16 code units, invisible and bidi characters stripped. Rendered
   through `textContent` only.
 - 5 posts per 10 s per player per game; 5,000 per game, refused as `full` (409).
-- Posting is not activity: the idle clock still runs on calls alone.
+- Posting is not activity: the idle clock still runs on calls and undos alone.
 - Calls and bingos are derived from the state push (`shared/timeline.ts`), so an undo
   erases its event with no chat-specific code.
 
@@ -240,11 +240,14 @@ Vitest dependency.
 
     players(pid, last_name_used, theme, created_at, last_seen)
     sessions(token_hash, pid, created_at, expires_at)
-    games(id, title, owner_pid, items_json, created_at, closed_at, chat_seq)
+    games(id, title, owner_pid, items_json, created_at, closed_at, chat_seq, last_activity_at)
     game_players(game_id, pid, char_name, board_json, joined_at, bingo_at, can_call)
     calls(game_id, item_idx, called_at)        -- PK (game_id, item_idx)
     messages(game_id, seq, pid, text, sent_at) -- PK (game_id, seq)
 
+- `last_activity_at` is the idle clock: set at creation, moved forward by every call and
+  undo, never back. It cannot be derived from `calls`, because an undo deletes the newest
+  row and would rewind it.
 - `calls` holds one row per called item: a square is called iff the row exists, and undo is
   a plain delete.
 - `char_name` lives on `game_players`, not `players`, because people bring alts.

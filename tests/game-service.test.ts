@@ -412,3 +412,54 @@ test("joining as a look-alike of someone already in the game is refused (#11)", 
   const cyrillic = await h.service.joinGame(BOB, h.gameId, "Thаlgrim");
   assert.equal(cyrillic.ok ? "joined" : cyrillic.error.code, "invalid");
 });
+
+const MIN = 60_000, HOUR = 60 * MIN;
+
+test("undoing the latest call does not make an active game look idle (#13)", async () => {
+  // The review's reproduction: calls at +1m and +7h01m, the second undone at
+  // +8h31m. Measured from the remaining call, the game was idle for 8.5h.
+  const h = await withGame();
+  await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
+  assert.ok((await h.service.setCaller(OWNER, h.gameId, "Thalgrim", true)).ok);
+  h.clock.advance(1 * MIN);
+  assert.ok((await h.service.call(ALICE, h.gameId, 1)).ok);
+  h.clock.advance(7 * HOUR);
+  assert.ok((await h.service.call(ALICE, h.gameId, 2)).ok);
+  h.clock.advance(1 * HOUR + 30 * MIN);
+
+  const undo = await h.service.undo(ALICE, h.gameId, 2);
+  assert.ok(undo.ok, "the undo itself is accepted");
+  const after = await h.service.view(ALICE, h.gameId);
+  assert.ok(after.ok && !after.value.closed, "a caller must not be able to close the game by undoing");
+
+  // The undo was activity: the clock runs from it.
+  h.clock.advance(IDLE_CLOSE_MS - 1000);
+  const still = await h.service.view(ALICE, h.gameId);
+  assert.ok(still.ok && !still.value.closed);
+  h.clock.advance(2000);
+  const idle = await h.service.view(ALICE, h.gameId);
+  assert.ok(idle.ok && idle.value.closed);
+  const row = await h.repo.getGame(h.gameId);
+  assert.equal(row?.closedAt, row!.lastActivityAt + IDLE_CLOSE_MS, "closed at 8h after the undo, not later");
+});
+
+test("undoing every call in an old game leaves it open (#13)", async () => {
+  const h = await withGame();
+  await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
+  h.clock.advance(7 * HOUR);
+  assert.ok((await h.service.call(OWNER, h.gameId, 4)).ok);
+  h.clock.advance(2 * HOUR);
+  assert.ok((await h.service.undo(OWNER, h.gameId, 4)).ok);
+  const view = await h.service.view(ALICE, h.gameId);
+  assert.ok(view.ok && !view.value.closed);
+});
+
+test("chat still does not keep a game alive (#13)", async () => {
+  const h = await withGame();
+  await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
+  h.clock.advance(IDLE_CLOSE_MS - 1000);
+  assert.ok((await h.service.postMessage(h.gameId, ALICE, "anyone there?")).ok);
+  h.clock.advance(2000);
+  const view = await h.service.view(ALICE, h.gameId);
+  assert.ok(view.ok && view.value.closed);
+});

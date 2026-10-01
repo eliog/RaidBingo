@@ -128,7 +128,7 @@ test("a database written before the column gains it, defaulting to no", async ()
 
   const db = openDatabase(file);
   const version = db.prepare("PRAGMA user_version").get() as { user_version: number };
-  assert.equal(version.user_version, 5);
+  assert.equal(version.user_version, 6);
 
   const row = db.prepare("SELECT can_call FROM game_players WHERE pid = ?").get("p") as { can_call: number };
   assert.equal(row.can_call, 0, "an existing player must not silently gain calling");

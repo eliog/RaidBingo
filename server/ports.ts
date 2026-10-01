@@ -37,6 +37,11 @@ export interface GameRow {
   itemsFrozen: boolean;
   createdAt: number;
   closedAt: number | null;
+  /**
+   * The idle clock. Starts at creation and moves forward on every call and
+   * undo, never back — derived from the calls table, an undo could rewind it.
+   */
+  lastActivityAt: number;
   /** The last chat `seq` issued. Nothing deletes a message, so also the count. */
   chatSeq: number;
 }
@@ -86,12 +91,14 @@ export interface Repository {
   deleteSession(tokenHash: string): Promise<void>;
 
   /** A new game has issued no chat `seq` yet, so `chatSeq` is not the caller's to set. */
-  createGame(row: Omit<GameRow, "chatSeq">): Promise<void>;
+  createGame(row: Omit<GameRow, "chatSeq" | "lastActivityAt">): Promise<void>;
   getGame(id: string): Promise<GameRow | null>;
   updateGameItems(id: string, items: string[]): Promise<void>;
   freezeGameItems(id: string): Promise<void>;
   setGameTitle(id: string, title: string): Promise<void>;
   closeGame(id: string, now: number): Promise<void>;
+  /** Moves the idle clock forward to `at`; never backwards. */
+  touchGame(id: string, at: number): Promise<void>;
   gamesForPlayer(pid: string): Promise<GameRow[]>;
   previousItemSets(ownerPid: string, limit: number): Promise<GameRow[]>;
 
