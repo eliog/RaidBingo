@@ -12,6 +12,8 @@ import type { MessageView } from "./game-service.ts";
 let hub: GameHub | null = null;
 export function setHub(h: GameHub | null): void { hub = h; }
 export function notifyGame(gameId: string): void { void hub?.push(gameId); }
+/** A session ended: close the sockets it opened. */
+export function endSessionSockets(tokenHash: string): void { hub?.endSession(tokenHash); }
 /** One small frame per message, so chat never drags the full state along. */
 export function notifyChat(gameId: string, message: MessageView): void { hub?.sendChat(gameId, message); }
 

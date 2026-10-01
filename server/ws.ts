@@ -22,6 +22,9 @@ import type { MessageView } from "./game-service.ts";
 /** Bytes. Anything larger is refused before it is buffered. */
 export const MAX_CLIENT_FRAME = 1024;
 
+/** Close code for "your session is gone": the client reloads rather than retrying. */
+export const SIGNED_OUT = 4401;
+
 /** Open sockets one player may hold to one game; another closes the oldest. */
 export const MAX_SOCKETS_PER_PLAYER = 4;
 
@@ -39,6 +42,8 @@ export class GameHub {
   readonly #rooms = new Map<string, Set<WebSocket>>();
   /** Whose each socket is. Weak, so a closed socket takes its entry with it. */
   readonly #owners = new WeakMap<WebSocket, string>();
+  /** Which session opened each socket, so ending the session can end it too. */
+  readonly #sessions = new WeakMap<WebSocket, string>();
   readonly #deps: Deps;
   /** The only Origin a browser handshake may carry. */
   readonly #origin: string;
@@ -86,6 +91,7 @@ export class GameHub {
 
         wss.handleUpgrade(request, socket, head, (ws) => {
           this.#join(gameId, session.pid, ws);
+          this.#sessions.set(ws, session.tokenHash);
           // Only the newcomer needs the current state. Pushing to the room
           // let one player redraw everyone's board by reconnecting in a loop.
           void this.#state(gameId).then((text) => {
@@ -118,6 +124,46 @@ export class GameHub {
       if (room.size === 0) this.#rooms.delete(gameId);
     });
     ws.on("error", () => ws.close());
+  }
+
+  /**
+   * The socket was authenticated once, at the handshake; without this a tab
+   * left open kept the feed after its session was logged out. Returns how
+   * many closed.
+   */
+  endSession(tokenHash: string): number {
+    let closed = 0;
+    for (const room of this.#rooms.values()) {
+      for (const ws of room) {
+        if (this.#sessions.get(ws) === tokenHash) {
+          ws.close(SIGNED_OUT, "signed out");
+          closed++;
+        }
+      }
+    }
+    return closed;
+  }
+
+  /**
+   * For sessions that ended without a logout here — expired, or deleted
+   * another way. One lookup per distinct session per pass.
+   */
+  async recheckSessions(): Promise<number> {
+    const now = this.#deps.clock.now();
+    const valid = new Map<string, boolean>();
+    let closed = 0;
+    for (const room of [...this.#rooms.values()]) {
+      for (const ws of [...room]) {
+        const hash = this.#sessions.get(ws);
+        if (hash === undefined) continue;
+        if (!valid.has(hash)) valid.set(hash, (await this.#deps.repo.findSession(hash, now)) !== null);
+        if (!valid.get(hash)) {
+          ws.close(SIGNED_OUT, "signed out");
+          closed++;
+        }
+      }
+    }
+    return closed;
   }
 
   /** Recompute and send the shared state for one game. */

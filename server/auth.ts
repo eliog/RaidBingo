@@ -7,7 +7,7 @@
  */
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { Deps } from "./app.ts";
+import { endSessionSockets, type Deps } from "./app.ts";
 import {
   derivePid, newSessionToken, hashSessionToken, signState, verifyState, newStateNonce,
   SESSION_MS, STATE_MAX_AGE_MS,
@@ -162,7 +162,9 @@ export function registerAuthRoutes(app: FastifyInstance, deps: Deps): void {
     scope.post("/auth/logout", async (request, reply) => {
       const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
       if (token !== undefined && token !== "") {
-        await deps.repo.deleteSession(hashSessionToken(token));
+        const hash = hashSessionToken(token);
+        await deps.repo.deleteSession(hash);
+        endSessionSockets(hash);
       }
       clearSessionCookie(reply, secure);
       return reply.redirect("/", 302);

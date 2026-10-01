@@ -835,7 +835,10 @@ function renderBoard() {
       composer.hidden = game.closed;
       draw();
     });
-    socket.addEventListener("close", () => {
+    socket.addEventListener("close", (ev) => {
+      // 4401: the session behind this socket ended (logout, expiry). A
+      // reconnect would only be refused, so go back through the front door.
+      if (ev.code === 4401) { location.reload(); return; }
       if (!downSince) downSince = Date.now();
       const elapsed = Date.now() - downSince;
       if (elapsed < 3000) setConn("live", "Live");           // don't flicker on a blip

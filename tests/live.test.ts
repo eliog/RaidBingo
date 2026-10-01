@@ -9,6 +9,7 @@ import { newSessionToken, hashSessionToken, SESSION_MS } from "../server/identit
 import { systemClock, seededRng } from "../shared/seams.ts";
 import { SESSION_COOKIE } from "../server/auth.ts";
 import { testConfig, fakeDiscord, items } from "./helpers.ts";
+import { runMaintenance } from "../server/maintenance.ts";
 
 /** A real server on a real port, with real sockets. */
 async function live() {
@@ -386,5 +387,85 @@ test("a connect sends state to the newcomer only, and a fifth socket closes the 
     assert.equal(watcher.ws.readyState, watcher.ws.OPEN, "another player's socket is untouched");
     for (const s of socks) s.close();
     watcher.close();
+  } finally { await h.stop(); }
+});
+
+/** Resolves with the close code, or "open" if the socket is still open after `ms`. */
+function closeCode(ws: WebSocket, ms = 1500): Promise<number | "open"> {
+  if (ws.readyState === ws.CLOSED) return Promise.resolve(-1);
+  return new Promise((res) => {
+    const t = setTimeout(() => res("open"), ms);
+    ws.once("close", (code) => { clearTimeout(t); res(code); });
+  });
+}
+
+/** A session that is not the harness's 90-day default. */
+async function sessionFor(h: Awaited<ReturnType<typeof live>>, pid: string, expiresInMs: number) {
+  await h.repo.upsertPlayer(pid, Date.now());
+  const token = newSessionToken();
+  await h.repo.createSession({ tokenHash: hashSessionToken(token), pid, createdAt: Date.now(), expiresAt: Date.now() + expiresInMs });
+  return { cookie: `${SESSION_COOKIE}=${encodeURIComponent(token)}`, hash: hashSessionToken(token) };
+}
+
+test("logging out closes that session's sockets with 4401, and nobody else's (#21)", async () => {
+  const h = await live();
+  try {
+    const laptop = await h.signIn("owner-pid");
+    const phone = await sessionFor(h, "owner-pid", SESSION_MS);      // same player, another device
+    const other = await h.signIn("player-pid");
+    const created = await h.service.createGame("owner-pid", "Tuesday BT run", items());
+    assert.ok(created.ok);
+    const gameId = created.value;
+    await h.service.joinGame("owner-pid", gameId, "Felwarden");
+    await h.service.joinGame("player-pid", gameId, "Thalgrim");
+
+    const a1 = h.socket(gameId, laptop), a2 = h.socket(gameId, laptop);
+    const p = h.socket(gameId, phone.cookie), o = h.socket(gameId, other);
+    for (const s of [a1, a2, p, o]) await s.until((m) => m["type"] === "state");
+
+    const closing = [closeCode(a1.ws), closeCode(a2.ws)];
+    const res = await fetch(`http://127.0.0.1:${h.port}/auth/logout`, {
+      method: "POST", headers: { cookie: laptop, "content-type": "application/x-www-form-urlencoded" }, redirect: "manual",
+    });
+    assert.equal(res.status, 302);
+    assert.deepEqual(await Promise.all(closing), [4401, 4401]);
+
+    // The phone and the other player stay connected and keep getting the feed.
+    assert.equal(await closeCode(p.ws, 200), "open");
+    assert.equal(await closeCode(o.ws, 200), "open");
+    // The owner's phone session still works for calling.
+    assert.equal((await h.post(`/api/games/${gameId}/call`, phone.cookie, { item: 3 })).status, 200);
+    for (const s of [p, o]) await s.until((m) => m["type"] === "state" && (m["called"] as unknown[]).length === 1);
+    p.close(); o.close();
+  } finally { await h.stop(); }
+});
+
+test("the sweep closes sockets whose session expired or was deleted, and keeps valid ones (#21)", async () => {
+  const h = await live();
+  try {
+    const short = await sessionFor(h, "owner-pid", 400);
+    const deleted = await sessionFor(h, "owner-pid", SESSION_MS);
+    const fine = await sessionFor(h, "player-pid", SESSION_MS);
+    const created = await h.service.createGame("owner-pid", "Tuesday BT run", items());
+    assert.ok(created.ok);
+    await h.service.joinGame("owner-pid", created.value, "Felwarden");
+    await h.service.joinGame("player-pid", created.value, "Thalgrim");
+
+    const s1 = h.socket(created.value, short.cookie);
+    const s2 = h.socket(created.value, deleted.cookie);
+    const s3 = h.socket(created.value, fine.cookie);
+    for (const s of [s1, s2, s3]) await s.until((m) => m["type"] === "state");
+
+    // Nothing to do yet.
+    assert.equal((await runMaintenance({ repo: h.repo, clock: systemClock, hub: h.hub })).socketsClosed, 0);
+
+    await h.repo.deleteSession(deleted.hash);                  // e.g. logged out elsewhere
+    await new Promise((r) => setTimeout(r, 450));              // and `short` has now expired
+    const codes = [closeCode(s1.ws), closeCode(s2.ws), closeCode(s3.ws, 300)];
+    const result = await runMaintenance({ repo: h.repo, clock: systemClock, hub: h.hub });
+    assert.equal(result.socketsClosed, 2);
+    assert.equal(result.sessionsPurged, 1, "the expired row went too");
+    assert.deepEqual(await Promise.all(codes), [4401, 4401, "open"]);
+    s3.close();
   } finally { await h.stop(); }
 });

@@ -13,9 +13,18 @@ export interface MaintenanceResult {
   socketsClosed: number;
 }
 
-export async function runMaintenance(deps: { repo: Repository; clock: Clock }): Promise<MaintenanceResult> {
+export interface MaintenanceDeps {
+  repo: Repository;
+  clock: Clock;
+  /** The live hub, when there is one. */
+  hub?: { recheckSessions(): Promise<number> } | undefined;
+}
+
+export async function runMaintenance(deps: MaintenanceDeps): Promise<MaintenanceResult> {
   // An expired session can never be used again, so keeping the row is only a
-  // login history nobody needs.
+  // login history nobody needs. First, so trouble with sockets can't skip it.
   const sessionsPurged = await deps.repo.deleteExpiredSessions(deps.clock.now());
-  return { sessionsPurged, socketsClosed: 0 };
+  // A purged session reads as gone, so the recheck closes its sockets too.
+  const socketsClosed = (await deps.hub?.recheckSessions()) ?? 0;
+  return { sessionsPurged, socketsClosed };
 }

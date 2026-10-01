@@ -8,6 +8,7 @@ import { testConfig, fakeDiscord, items, T0 } from "./helpers.ts";
 import { SESSION_COOKIE, OAUTH_COOKIE } from "../server/auth.ts";
 import { LOOKUP_MISSES, LOOKUP_WINDOW_MS } from "../server/routes.ts";
 import { apiRequest } from "../shared/request.ts";
+import { SIGNED_OUT } from "../server/ws.ts";
 import { usePresetFile } from "../server/presets.ts";
 import { writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -653,4 +654,11 @@ test("presets go to anyone who logs in — deliberately, see README (#18)", asyn
     usePresetFile(null);
     await rm(file, { force: true });
   }
+});
+
+test("the client treats close code 4401 as signed out, not as a blip to retry (#21)", async () => {
+  const h = app();
+  const client = await h.instance.inject({ method: "GET", url: "/assets/app.js" });
+  assert.match(client.body, /if \(ev\.code === 4401\) \{ location\.reload\(\); return; \}/);
+  assert.equal(SIGNED_OUT, 4401, "server and client agree on the code");
 });

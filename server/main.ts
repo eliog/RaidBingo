@@ -48,7 +48,7 @@ hub.attach(app.server);
 console.log(`raid bingo listening on ${config.baseUrl} (port ${config.port})`);
 
 // Never fatal: a failed sweep is retried on the next tick.
-const maintain = () => { runMaintenance(deps).catch((e) => console.error(`maintenance failed: ${(e as Error).message}`)); };
+const maintain = () => { runMaintenance({ ...deps, hub }).catch((e) => console.error(`maintenance failed: ${(e as Error).message}`)); };
 maintain();
 const maintenance = setInterval(maintain, MAINTENANCE_EVERY_MS);
 maintenance.unref();
