@@ -710,3 +710,43 @@ test("a re-login with a stale, unknown or malformed session cookie still works (
     assert.ok(await signedIn(h, fresh), existing);
   }
 });
+
+const form = { "content-type": "application/x-www-form-urlencoded" };
+const logout = (h: ReturnType<typeof app>, headers: Record<string, string>) =>
+  h.instance.inject({ method: "POST", url: "/auth/logout", headers: { ...form, ...headers }, payload: "" });
+
+test("another site cannot log a player out (#23)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  const attempts: Record<string, string>[] = [
+    { origin: "https://evil.example" },
+    { origin: "null" },                                                 // sandboxed frame, data: url
+    { origin: "https://raidbingo.test.evil.example" },
+    { origin: "http://raidbingo.test" },                                // wrong scheme
+    { "sec-fetch-site": "cross-site" },
+    { "sec-fetch-site": "same-site" },                                  // a sibling subdomain
+    { origin: "https://raidbingo.test", "sec-fetch-site": "cross-site" },
+  ];
+  for (const extra of attempts) {
+    const res = await logout(h, { cookie, ...extra });
+    assert.equal(res.statusCode, 403, JSON.stringify(extra));
+    assert.equal(res.headers["set-cookie"], undefined, "nothing cleared");
+    assert.ok(await signedIn(h, cookie), `still signed in after ${JSON.stringify(extra)}`);
+  }
+});
+
+test("logging out from the site itself still works, from a form or a script (#23)", async () => {
+  const h = app();
+  for (const extra of [
+    { origin: "https://raidbingo.test", "sec-fetch-site": "same-origin" },   // the real logout form
+    { "sec-fetch-site": "same-origin" },
+    { "sec-fetch-site": "none" },                                            // typed or bookmarked
+    {},                                                                       // no browser headers at all
+  ] as Record<string, string>[]) {
+    const cookie = await signIn(h, "1");
+    const res = await logout(h, { cookie, ...extra });
+    assert.equal(res.statusCode, 302, JSON.stringify(extra));
+    assert.match(String(res.headers["set-cookie"]), /Max-Age=0/);
+    assert.equal(await signedIn(h, cookie), false);
+  }
+});

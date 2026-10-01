@@ -78,6 +78,7 @@ export async function currentPid(
 
 export function registerAuthRoutes(app: FastifyInstance, deps: Deps): void {
   const secure = deps.config.baseUrl.startsWith("https:");
+  const siteOrigin = new URL(deps.config.baseUrl).origin;
 
   app.get("/auth/login", async (request, reply) => {
     const returnTo = String((request.query as Record<string, unknown>)["returnTo"] ?? "/");
@@ -170,6 +171,18 @@ export function registerAuthRoutes(app: FastifyInstance, deps: Deps): void {
     );
 
     scope.post("/auth/logout", async (request, reply) => {
+      // SameSite=Lax keeps the cookie off a cross-site POST, but the clearing
+      // Set-Cookie in our response would still land, so any page could sign a
+      // player out. A browser always says where a POST came from; something
+      // with neither header isn't a browser being steered by another site.
+      const origin = request.headers.origin;
+      const site = request.headers["sec-fetch-site"];
+      if ((origin !== undefined && origin !== siteOrigin) ||
+          (site !== undefined && site !== "same-origin" && site !== "none")) {
+        return reply.type("text/html").code(403).send(
+          errorPage("That wasn't us", "Sign out from Raid Bingo itself, using the menu under your name.", "/"),
+        );
+      }
       const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
       if (token !== undefined && token !== "") {
         const hash = hashSessionToken(token);
