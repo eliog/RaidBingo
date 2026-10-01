@@ -6,6 +6,7 @@ import { fixedClock, seededRng } from "../shared/seams.ts";
 import { derivePid } from "../server/identity.ts";
 import { testConfig, fakeDiscord, items, T0 } from "./helpers.ts";
 import { SESSION_COOKIE } from "../server/auth.ts";
+import { LOOKUP_MISSES, LOOKUP_WINDOW_MS } from "../server/routes.ts";
 
 function app(discordUserId = "1099") {
   const repo = createRepository(openDatabase(":memory:"));
@@ -439,5 +440,56 @@ test("a stranger's game page and api carry no squares, names or boards (#8)", as
     assert.equal(res.statusCode, 200, url);
     assert.ok(!res.body.includes("Felwarden"), `${url} leaked a name`);
     assert.ok(!res.body.includes(items()[0] as string), `${url} leaked a square`);
+  }
+});
+
+test("guessing game ids is limited across every route, and the limit hides hits too (#9)", async () => {
+  const h = app();
+  const owner = await signIn(h, "1");
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie: owner },
+    payload: { title: "Tuesday BT run", items: items() } });
+  const real = (made.json() as { id: string }).id;
+  const guesser = { "fly-client-ip": "203.0.113.9" };
+
+  // Misses spread over the signed-out routes all count against one budget.
+  const routes = ["/g/wyrm-lantern-ward", "/og/wyrm-lantern-ward.png"];
+  for (let i = 0; i < LOOKUP_MISSES; i++) {
+    const res = await h.instance.inject({ method: "GET", url: routes[i % 2] as string, headers: guesser });
+    assert.equal(res.statusCode, 404);
+  }
+  for (const url of [...routes, `/g/${real}`, `/og/${real}.png`]) {
+    const res = await h.instance.inject({ method: "GET", url, headers: guesser });
+    assert.equal(res.statusCode, 429, `${url} should be refused, real or not`);
+    assert.ok(Number(res.headers["retry-after"]) > 0);
+  }
+
+  // Someone else is unaffected, and the window passes.
+  const other = await h.instance.inject({ method: "GET", url: `/g/${real}`, headers: { "fly-client-ip": "198.51.100.4" } });
+  assert.equal(other.statusCode, 200);
+  h.clock.advance(LOOKUP_WINDOW_MS);
+  const later = await h.instance.inject({ method: "GET", url: `/g/${real}`, headers: guesser });
+  assert.equal(later.statusCode, 200);
+});
+
+test("a signed-in guesser is limited by account as well as by address (#9)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "7");
+  for (let i = 0; i < LOOKUP_MISSES; i++) {
+    const ip = { cookie, "fly-client-ip": `203.0.113.${i}` };   // a new address every time
+    assert.equal((await h.instance.inject({ method: "GET", url: "/api/games/wyrm-lantern-ward", headers: ip })).statusCode, 404);
+  }
+  const res = await h.instance.inject({ method: "GET", url: "/api/games/wyrm-lantern-ward",
+    headers: { cookie, "fly-client-ip": "198.51.100.99" } });
+  assert.equal(res.statusCode, 429);
+});
+
+test("hits never count, so a busy player is never limited (#9)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie },
+    payload: { title: "Tuesday BT run", items: items() } });
+  const id = (made.json() as { id: string }).id;
+  for (let i = 0; i < LOOKUP_MISSES * 3; i++) {
+    assert.equal((await h.instance.inject({ method: "GET", url: `/api/games/${id}`, headers: { cookie } })).statusCode, 200);
   }
 });

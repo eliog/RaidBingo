@@ -10,6 +10,10 @@ import { ogCache, ogTags, type OgState } from "./og.ts";
 import { loadPresets } from "./presets.ts";
 import { isTheme, type Theme } from "../shared/validate.ts";
 
+/** Unknown game ids one client may ask about per window, across every route. */
+export const LOOKUP_MISSES = 20;
+export const LOOKUP_WINDOW_MS = 10 * 60_000;
+
 const STATUS: Record<ServiceError["code"], number> = {
   not_found: 404,
   forbidden: 403,
@@ -68,10 +72,45 @@ function page(title: string, state: { theme?: Theme; [key: string]: unknown }, h
 
 export function registerRoutes(app: FastifyInstance, deps: Deps): void {
   const service = new GameService(deps.repo, deps.clock, deps.rng);
-  // Join-by-id is the only place an id can be guessed at, so it is the only
-  // thing that needs a limiter.
+  // Join attempts, per player. Guessing through any other route that takes an
+  // id is held back by the lookup limiter below.
   const joinLimiter = new RateLimiter(deps.clock, 10, 60_000);
   const ogPng = ogCache();
+  const lookupLimiter = new RateLimiter(deps.clock, LOOKUP_MISSES, LOOKUP_WINDOW_MS);
+
+  /**
+   * Every route that resolves a game id answers 404 for one that does not
+   * exist, so each is a way to test guesses — not just join. Misses are
+   * counted per client IP, and per player when signed in. Real use almost
+   * never misses (links are pasted, not typed), so the limit is tight. Once a
+   * key is over it, every lookup is refused, hits included, or the 429 itself
+   * would tell a real id from a fake one.
+   */
+  const lookupKeys = async (request: FastifyRequest): Promise<string[]> => {
+    // Fly's proxy sets this and overwrites any value a client sends.
+    const ip = String(request.headers["fly-client-ip"] ?? request.ip);
+    const pid = await currentPid(deps, request);
+    return pid === null ? [`ip:${ip}`] : [`ip:${ip}`, `pid:${pid}`];
+  };
+  const resolvesId = (request: FastifyRequest) => request.routeOptions.url?.includes(":id") === true;
+
+  app.addHook("onRequest", async (request, reply) => {
+    if (!resolvesId(request)) return;
+    for (const key of await lookupKeys(request)) {
+      const wait = lookupLimiter.peek(key);
+      if (wait === null) continue;
+      reply.header("retry-after", String(wait));
+      const message = "Too many links that don't lead anywhere. Try again in a few minutes.";
+      return request.url.startsWith("/g/")
+        ? reply.code(429).type("text/html").send(errorPage("Slow down", message, "/"))
+        : reply.code(429).send({ error: { code: "rate_limited", message } });
+    }
+  });
+
+  app.addHook("onResponse", async (request, reply) => {
+    if (!resolvesId(request) || reply.statusCode !== 404) return;
+    for (const key of await lookupKeys(request)) lookupLimiter.check(key);
+  });
 
   /**
    * Defence in depth against CSRF. SameSite=Lax already stops the session

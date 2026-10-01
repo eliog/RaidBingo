@@ -31,6 +31,14 @@ export class RateLimiter {
     return null;
   }
 
+  /** Like check(), but records nothing: seconds to wait, or null if under. */
+  peek(key: string): number | null {
+    const now = this.#clock.now();
+    const recent = (this.#hits.get(key) ?? []).filter((t) => now - t < this.#windowMs);
+    if (recent.length < this.#limit) return null;
+    return Math.max(1, Math.ceil((this.#windowMs - (now - (recent[0] as number))) / 1000));
+  }
+
   #lastPrune = 0;
 
   /**

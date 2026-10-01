@@ -102,6 +102,10 @@ Three distinct words from a curated pool of ~512 WoW words, e.g.
   makes the join box an enumeration oracle against the keyspace and leaks the existence of
   games the user cannot see. Paste is the primary path; typing is the rare fallback.
 - Rate-limit the join endpoint to ~10 attempts/minute.
+- Every other route that resolves an id (`/g/:id`, `/og/:id.png`, `/api/games/:id/*`) 404s
+  on a missing game, so each is an oracle too. Misses are limited per client IP and per
+  player (20 per 10 min, all routes together); over the limit every lookup gets 429,
+  hits included, so the 429 cannot tell a real id from a fake one.
 
 ## Identity
 
