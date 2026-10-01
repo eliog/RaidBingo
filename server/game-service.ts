@@ -182,9 +182,12 @@ export class GameService {
   }
 
   async setTitle(pid: string, gameId: string, rawTitle: string): Promise<Result<string>> {
-    const game = await this.#repo.getGame(gameId);
+    const game = await this.#liveGame(gameId);
     if (game === null) return err("not_found", "That game doesn't exist.");
     if (game.ownerPid !== pid) return err("forbidden", "Only the game's owner can rename it.");
+    // A finished night is history: its title is what the lobby and the old
+    // Discord previews already show.
+    if (game.closedAt !== null) return err("closed", "That game is closed.");
     const title = validateTitle(rawTitle);
     if (!title.ok) return err("invalid", title.reason);
     await this.#repo.setGameTitle(gameId, title.value);
@@ -192,9 +195,12 @@ export class GameService {
   }
 
   async closeGame(pid: string, gameId: string): Promise<Result<null>> {
-    const game = await this.#repo.getGame(gameId);
+    // #liveGame first, so a game that already went quiet keeps the time it
+    // actually closed rather than the time the owner noticed.
+    const game = await this.#liveGame(gameId);
     if (game === null) return err("not_found", "That game doesn't exist.");
     if (game.ownerPid !== pid) return err("forbidden", "Only the game's owner can close it.");
+    if (game.closedAt !== null) return ok(null);
     await this.#repo.closeGame(gameId, this.#clock.now());
     return ok(null);
   }

@@ -520,3 +520,18 @@ test("a callback link only works in the browser that started the login (#10)", a
   assert.match(set[0] as string, new RegExp(`^${SESSION_COOKIE}=`));
   assert.match(set[1] as string, new RegExp(`^${OAUTH_COOKIE}=; Path=/auth/callback;.*Max-Age=0`));
 });
+
+test("renaming a closed game over the api is a 409 (#14)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie },
+    payload: { title: "Tuesday BT run", items: items() } });
+  const id = (made.json() as { id: string }).id;
+  const rename = (title: string) => h.instance.inject({ method: "POST", url: `/api/games/${id}/title`,
+    headers: { cookie }, payload: { title } });
+  assert.equal((await rename("Wednesday BT run")).statusCode, 200);
+  assert.equal((await h.instance.inject({ method: "POST", url: `/api/games/${id}/close`, headers: { cookie }, payload: {} })).statusCode, 200);
+  const late = await rename("Rewritten");
+  assert.equal(late.statusCode, 409);
+  assert.equal((late.json() as { error: { code: string } }).error.code, "closed");
+});

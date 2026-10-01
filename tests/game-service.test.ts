@@ -463,3 +463,44 @@ test("chat still does not keep a game alive (#13)", async () => {
   const view = await h.service.view(ALICE, h.gameId);
   assert.ok(view.ok && view.value.closed);
 });
+
+test("a closed game cannot be renamed, explicitly closed or idle (#14)", async () => {
+  const h = await withGame();
+  assert.ok((await h.service.setTitle(OWNER, h.gameId, "Renamed while open")).ok, "an open game can be renamed");
+  assert.ok((await h.service.closeGame(OWNER, h.gameId)).ok);
+  const renamed = await h.service.setTitle(OWNER, h.gameId, "Rewriting history");
+  assert.equal(renamed.ok ? "renamed" : renamed.error.code, "closed");
+  assert.equal((await h.repo.getGame(h.gameId))?.title, "Renamed while open");
+
+  const idle = await withGame();
+  idle.clock.advance(IDLE_CLOSE_MS + 1000);
+  const r = await idle.service.setTitle(OWNER, idle.gameId, "After the fact");
+  assert.equal(r.ok ? "renamed" : r.error.code, "closed", "an idle game is closed even if nobody looked yet");
+});
+
+test("closing a game that already went idle keeps the time it actually closed (#14)", async () => {
+  const h = await withGame();
+  h.clock.advance(IDLE_CLOSE_MS + 5 * HOUR);
+  assert.ok((await h.service.closeGame(OWNER, h.gameId)).ok, "closing a closed game is a harmless no-op");
+  const row = await h.repo.getGame(h.gameId);
+  assert.equal(row?.closedAt, T0 + IDLE_CLOSE_MS, "closed when it went quiet, not when the owner noticed");
+
+  // And a second explicit close does not move an explicit close either.
+  const g = await withGame();
+  assert.ok((await g.service.closeGame(OWNER, g.gameId)).ok);
+  const first = (await g.repo.getGame(g.gameId))?.closedAt;
+  g.clock.advance(HOUR);
+  assert.ok((await g.service.closeGame(OWNER, g.gameId)).ok);
+  assert.equal((await g.repo.getGame(g.gameId))?.closedAt, first);
+});
+
+test("only the owner can rename or close, open or not (#14)", async () => {
+  const h = await withGame();
+  await h.service.joinGame(ALICE, h.gameId, "Thalgrim");
+  assert.ok((await h.service.setCaller(OWNER, h.gameId, "Thalgrim", true)).ok);
+  for (const r of [await h.service.setTitle(ALICE, h.gameId, "Mine now"), await h.service.closeGame(ALICE, h.gameId)]) {
+    assert.equal(r.ok ? "allowed" : r.error.code, "forbidden");
+  }
+  const missing = await h.service.closeGame(OWNER, "no-such-game");
+  assert.equal(missing.ok ? "closed" : missing.error.code, "not_found");
+});
