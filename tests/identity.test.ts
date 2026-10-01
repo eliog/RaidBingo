@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   derivePid, newSessionToken, hashSessionToken,
-  signState, verifyState, STATE_MAX_AGE_MS,
+  signState, verifyState, safeReturnTo, STATE_MAX_AGE_MS,
 } from "../server/identity.ts";
 
 const SECRET = "a".repeat(64);
@@ -66,4 +66,21 @@ test("an absolute url in returnTo is downgraded to the site root", () => {
   // An open redirect would let a game link carry someone off-site after login.
   assert.equal(verifyState(signState("https://evil.example/x", SECRET, now), SECRET, now), "/");
   assert.equal(verifyState(signState("//evil.example/x", SECRET, now), SECRET, now), "/");
+});
+
+test("returnTo values a browser would resolve off-site are downgraded to the root (#6)", () => {
+  const now = Date.now();
+  const base = "https://raidbingo.test";
+  const hostile = ["/\\evil.example", "/\\/evil.example", "/\t/evil.example", "/\n/evil.example",
+    "\\\\evil.example", "/ /evil.example", "/x\\y", "/x\r\ny", "javascript:alert(1)", ""];
+  for (const rt of hostile) {
+    const back = verifyState(signState(rt, SECRET, now), SECRET, now);
+    assert.equal(back, "/", JSON.stringify(rt));
+  }
+  // The guard is about where a browser lands, so check that directly too.
+  for (const rt of hostile) assert.equal(new URL(safeReturnTo(rt), base).origin, base, JSON.stringify(rt));
+
+  for (const rt of ["/", "/new", "/g/wyrm-lantern-ward", "/%2F/stays-here", "/g/a-b-c?x=1"]) {
+    assert.equal(verifyState(signState(rt, SECRET, now), SECRET, now), rt);
+  }
 });

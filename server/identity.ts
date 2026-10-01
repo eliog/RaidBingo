@@ -40,11 +40,23 @@ const b64u = (s: string) => Buffer.from(s, "utf8").toString("base64url");
 const unb64u = (s: string) => Buffer.from(s, "base64url").toString("utf8");
 
 /**
+ * A same-site path or the root. Browsers resolve a Location of `/\host` or
+ * `/<tab>/host` to another origin — backslash reads as slash, and tab and
+ * newline are dropped — so "starts with one slash" is not enough on its own.
+ * No second slash or backslash up front, and no backslash, whitespace or
+ * control character anywhere. A raw newline would also make the redirect throw.
+ */
+export function safeReturnTo(returnTo: unknown): string {
+  return typeof returnTo === "string" && /^\/(?![/\\])[^\\\s\x00-\x1f\x7f]*$/.test(returnTo)
+    ? returnTo : "/";
+}
+
+/**
  * The OAuth `state` parameter, signed so the callback can trust it, and
  * carrying the deep link the player originally clicked.
  */
 export function signState(returnTo: string, secret: string, now: number): string {
-  const safe = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
+  const safe = safeReturnTo(returnTo);
   const body = b64u(JSON.stringify({ returnTo: safe, issuedAt: now, nonce: randomBytes(9).toString("base64url") } satisfies StatePayload));
   const sig = createHmac("sha256", secret).update(body, "utf8").digest("base64url");
   return `${body}.${sig}`;
@@ -73,7 +85,5 @@ export function verifyState(state: string, secret: string, now: number): string 
   if (typeof payload.issuedAt !== "number") return null;
   if (now - payload.issuedAt > STATE_MAX_AGE_MS) return null;
   if (now + 60_000 < payload.issuedAt) return null; // issued in the future
-  const back = payload.returnTo;
-  if (typeof back !== "string" || !back.startsWith("/") || back.startsWith("//")) return "/";
-  return back;
+  return safeReturnTo(payload.returnTo);
 }
