@@ -94,7 +94,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
   if (url.protocol === "http:" && !isLocal) {
     throw new ConfigError(
       `BASE_URL uses http on ${url.hostname}. Session cookies are Secure, so login would ` +
-        `silently never work. Use https (Caddy issues the certificate automatically).`,
+        `silently never work. Use https.`,
     );
   }
   const baseUrl = url.origin;

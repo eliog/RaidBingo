@@ -262,3 +262,20 @@ test("a name already taken comes back with usable alternatives", async () => {
   assert.equal(body.error.code, "name_taken");
   assert.ok((body.error.suggestions ?? []).length > 0);
 });
+
+test("security headers are set by the app, since no proxy in front adds them", async () => {
+  const h = app();
+  const res = await h.instance.inject({ method: "GET", url: "/healthz" });
+  assert.equal(res.headers["strict-transport-security"], "max-age=31536000; includeSubDomains");
+  assert.equal(res.headers["x-frame-options"], "DENY");
+  assert.match(String(res.headers["content-security-policy"]), /frame-ancestors 'none'/);
+});
+
+test("www redirects to the canonical origin, keeping the path", async () => {
+  const h = app();
+  const res = await h.instance.inject({
+    method: "GET", url: "/g/a-b-c?x=1", headers: { host: "www.raidbingo.test" },
+  });
+  assert.equal(res.statusCode, 301);
+  assert.equal(res.headers["location"], "https://raidbingo.test/g/a-b-c?x=1");
+});

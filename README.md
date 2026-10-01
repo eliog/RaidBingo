@@ -37,15 +37,29 @@ It must match exactly. Local development uses `http://localhost:3000/auth/callba
 
 ## Deploying
 
-Any small Linux box will do. `deploy/` has a Caddyfile and a systemd unit.
+It runs on [Fly.io](https://fly.io) as **one machine with one volume**. SQLite and the
+in-memory WebSocket fanout both pin it to a single instance, so never scale it past one.
+Fly terminates TLS and issues the certificate; the app sets HSTS and the other security
+headers itself.
 
-1. Point an A record at the machine and open ports **80 and 443**. Port 80 is not
-   optional — it serves the ACME challenge and the HTTP→HTTPS redirect.
-2. Put the secrets in `/etc/raidbingo/env`, owned by root, mode `0600`. The unit reads
-   them with `EnvironmentFile=`, which is why the unit itself is safe to commit.
-3. Install the Caddyfile. Caddy obtains and renews the certificate itself; there is no
-   certbot and no cron job.
-4. `systemctl enable --now raidbingo`
+```sh
+fly launch --no-deploy --copy-config      # pick your own app name; edit fly.toml to match
+fly volumes create bingo_data --size 1     # same region as primary_region
+fly secrets set DISCORD_CLIENT_ID=... DISCORD_CLIENT_SECRET=... \
+  PID_SECRET=... SESSION_SECRET=... BASE_URL=https://your.domain
+fly deploy --ha=false
+fly certs add your.domain                  # then point DNS where it tells you
+```
+
+Register `BASE_URL/auth/callback` as the redirect URI in your own Discord application.
+Every fork needs its own.
+
+`presets.json` goes on the volume, not into the image, so it never leaves your hands:
+
+```sh
+fly ssh sftp shell      # then: put presets.json /data/presets.json
+fly machine restart
+```
 
 Cookies are `Secure`, so **the app does not work over plain HTTP** anywhere except
 localhost. That is checked at startup rather than failing silently at login.
@@ -53,14 +67,15 @@ localhost. That is checked at startup rather than failing silently at login.
 ### Fonts for the link preview
 
 When a game link is pasted into Discord, the unfurl image is generated server-side.
-Fonts do not travel inside an SVG, so drop `Cinzel-Bold.ttf`, `AlegreyaSans-Bold.ttf` and
+The Docker image fetches the fonts at build time. For local runs, fonts do not travel
+inside an SVG, so drop `Cinzel-Bold.ttf`, `AlegreyaSans-Bold.ttf` and
 a monospace face (JetBrains Mono or IBM Plex Mono, both OFL) into `fonts/`, with their
 licence files. Without them the image still renders, in whatever the host happens to have.
 
 ## Preset squares
 
 The create screen offers starting points under **Start from**: your own previous games,
-plus any presets you configure. Presets live in `presets.json` at the project root:
+plus any presets you configure. Presets live in `presets.json` at the project root (on Fly, on the volume — see above):
 
 ```json
 [{ "name": "DEA Defaults", "items": ["Someone pulls before the count", "..."] }]

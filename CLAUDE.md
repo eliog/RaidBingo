@@ -70,7 +70,8 @@ can prefill and edit. No schema needed — `games.items_json` keyed by `owner_pi
 library.
 
 Alongside those, `presets.json` at the project root supplies fixed starting sets. It is
-**not committed**: a guild's squares name real people and this repo is public. A missing
+**not committed**: a guild's squares name real people and this repo is public. On Fly it lives
+on the volume (`/app/presets.json` is a symlink to `/data/presets.json`). A missing
 or malformed file is never fatal — bad entries are skipped with a warning and the screen
 offers fewer starting points.
 
@@ -129,7 +130,7 @@ Three distinct words from a curated pool of ~512 WoW words, e.g.
 
 ## Stack
 
-Small DigitalOcean droplet.
+One [Fly.io](https://fly.io) machine with one volume (`fly.toml`, `Dockerfile`).
 
 - **TypeScript on Node 24 LTS** — Fastify, `ws`. Run directly, no build step: Node strips
   types at load. That means **only erasable syntax** — no parameter properties
@@ -139,23 +140,18 @@ Small DigitalOcean droplet.
 - **SQLite** via the built-in `node:sqlite` (WAL) — no native dependencies, so the Docker
   image is a plain `node:24-slim` with no build toolchain
 - Discord OAuth2 handled directly; no Discord library needed
-- **Caddy** reverse proxy for automatic Let's Encrypt TLS
-- **systemd**
+- **Fly.io** terminates TLS and issues the certificate; the app sets its own security
+  headers, since nothing else in front does
 
 ### Deployment and TLS
 
-Served over HTTPS only. Caddy provisions and renews Let's Encrypt certificates
-automatically and redirects HTTP to HTTPS; HSTS is **not** on by default, so set it.
+Served over HTTPS only. Fly's proxy terminates TLS (`fly certs add`) and `force_https`
+redirects HTTP. Fly does **not** set HSTS, so the app does, in an `onSend` hook in
+`server/app.ts` alongside the CSP and the other headers. `www.` redirects to `BASE_URL`.
+Leave `preload` off HSTS — easy to join the preload list, painful to leave it.
 
-    raidbingo.com {
-        reverse_proxy localhost:3000
-        header Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    }
-
-Leave `preload` off — easy to join the preload list, painful to leave it.
-
-Prerequisites: an A record at the droplet, and ports **80 and 443** open. Port 80 is
-required for the ACME challenge and the redirect.
+The machine never auto-stops (`auto_stop_machines = "off"`): live boards hold sockets
+and idle auto-close runs on a timer. Deploy with `--ha=false`.
 
 **Never hardcode the domain.** `BASE_URL` is config (this deployment uses
 `https://raidbingo.com`; forks use their own). It is used for:
@@ -174,7 +170,7 @@ permits. Local dev works because browsers treat `http://localhost` as a secure c
 
 Two things pin this to one instance:
 
-1. SQLite pins deployment to one pod (`ReadWriteOnce` volume).
+1. SQLite pins deployment to one machine (a Fly volume attaches to exactly one).
 2. WebSocket fanout lives in process memory.
 
 Keep data access behind a **repository interface** with plain SQL, so SQLite can be
@@ -263,7 +259,7 @@ permission.
 
 - `.gitignore` in the first commit: `.env*`, `!.env.example`, `*.db`, `data/`
 - A committed `.env.example` with placeholders only
-- Secrets in `/etc/bingo/env` (mode 0600) via systemd `EnvironmentFile=`
+- Secrets via `fly secrets set`, never in `fly.toml`
 - gitleaks as a pre-commit hook **and** a GitHub Action; enable GitHub push protection
 
 **Never write a fallback secret:**
@@ -278,7 +274,7 @@ Rotation is the remediation, not deletion.
 
 **`PID_SECRET` cannot be rotated casually** — it changes every player ID, reshuffling
 cards and detaching history. Generate once with `openssl rand -hex 32` and back it up off
-the droplet.
+Fly — `fly secrets` cannot be read back.
 
 ## Prototype
 
@@ -299,8 +295,6 @@ bug, so a runtime guard grows the row and flags the cell if it still overflows.
 
 - The word pool is 243 words (14.2M ordered triples) against the ~512 target above.
   Growing it is just appending to `WORDS` in `shared/ids.ts`.
-- `fonts/` is empty. The link-preview image renders in fallback faces until the three
-  OFL fonts are dropped in — see `fonts/README.md`.
 - No Playwright end-to-end test yet; the call/undo path is covered at the service and
   HTTP layers only.
 

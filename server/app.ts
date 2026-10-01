@@ -22,6 +22,37 @@ export interface Deps {
 
 export function buildApp(deps: Deps): FastifyInstance {
   const app = Fastify({ logger: false, trustProxy: true });
+  const base = new URL(deps.config.baseUrl);
+
+  // www is served a certificate too, but the canonical origin is BASE_URL:
+  // the session cookie and the OAuth redirect are both pinned to it.
+  app.addHook("onRequest", async (request, reply) => {
+    if (request.hostname === `www.${base.hostname}`) {
+      return reply.redirect(base.origin + request.url, 301);
+    }
+  });
+
+  // Nothing sits in front of the app to add these (Fly's proxy only
+  // terminates TLS), so they are set here. HSTS deliberately omits `preload`:
+  // joining the preload list is easy and leaving it is painful.
+  app.addHook("onSend", async (_request, reply) => {
+    if (base.protocol === "https:") {
+      reply.header("strict-transport-security", "max-age=31536000; includeSubDomains");
+    }
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("referrer-policy", "strict-origin-when-cross-origin");
+    reply.header("x-frame-options", "DENY");
+    reply.header("permissions-policy", "geolocation=(), microphone=(), camera=()");
+    // The only third party is Google Fonts. Everything else is same-origin,
+    // and there is no inline script beyond the state blob the page embeds.
+    reply.header(
+      "content-security-policy",
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; " +
+        "frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    );
+  });
 
   app.get("/healthz", async () => ({ ok: true }));
 

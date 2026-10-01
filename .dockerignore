@@ -1,0 +1,8 @@
+# Only what the Dockerfile copies is needed; keep secrets and data out of the
+# build context entirely, not just out of the image.
+*
+!package.json
+!package-lock.json
+!shared/
+!server/
+!client/

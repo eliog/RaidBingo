@@ -1,0 +1,40 @@
+# Fly.io. Set `app` to your own app name; BASE_URL and secrets are not here.
+#   fly secrets set DISCORD_CLIENT_ID=... DISCORD_CLIENT_SECRET=... \
+#     PID_SECRET=... SESSION_SECRET=... BASE_URL=https://raidbingo.com
+
+app = "raidbingo"
+primary_region = "iad"
+
+# The app says goodbye on SIGTERM before draining, so clients can tell a
+# deploy from a network blip.
+kill_signal = "SIGTERM"
+kill_timeout = 10
+
+[env]
+  PORT = "3000"
+  DB_PATH = "/data/bingo.db"
+
+# SQLite lives here. A volume attaches to exactly one machine, which is also
+# what WebSocket fanout in process memory requires. Never scale past one.
+[mounts]
+  source = "bingo_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Never stop: idle auto-close runs on a timer and live boards hold sockets.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
