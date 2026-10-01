@@ -255,7 +255,6 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
       const called = await service.call(pid, request.params.id, item);
       if (!called.ok) return fail(reply, called.error);
       notifyGame(request.params.id);
-      notifyGame(request.params.id);
       const view = await service.view(pid, request.params.id);
       return reply.send({ winners: called.value.winners, game: view.ok ? view.value : null });
     },
@@ -269,7 +268,6 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
       const item = Number((request.body ?? {}).item);
       const undone = await service.undo(pid, request.params.id, item);
       if (!undone.ok) return fail(reply, undone.error);
-      notifyGame(request.params.id);
       notifyGame(request.params.id);
       const view = await service.view(pid, request.params.id);
       return reply.send({ game: view.ok ? view.value : null });

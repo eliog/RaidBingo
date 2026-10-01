@@ -323,3 +323,33 @@ test("a client that sends anything is cut off, and an oversized frame is never b
     quiet.close();
   } finally { await h.stop(); }
 });
+
+test("a call and an undo each reach a viewer as exactly one state frame (#7)", async () => {
+  const h = await live();
+  try {
+    const owner = await h.signIn("owner-pid");
+    const created = await h.service.createGame("owner-pid", "Tuesday BT run", items());
+    assert.ok(created.ok);
+    const gameId = created.value;
+    await h.service.joinGame("owner-pid", gameId, "Felwarden");
+
+    const viewer = h.socket(gameId, owner);
+    await viewer.until((m) => m["type"] === "state");
+    // Counted off the raw socket: a timed-out until() would leave its waiter
+    // queued and swallow the next frame.
+    const frames: number[] = [];
+    viewer.ws.on("message", (data) => {
+      const m = JSON.parse(String(data)) as Record<string, unknown>;
+      if (m["type"] === "state") frames.push((m["called"] as unknown[]).length);
+    });
+
+    for (const [path, expect] of [["call", 1], ["undo", 0]] as const) {
+      frames.length = 0;
+      const res = await h.post(`/api/games/${gameId}/${path}`, owner, { item: 7 });
+      assert.equal(res.status, 200);
+      await new Promise((r) => setTimeout(r, 300));
+      assert.deepEqual(frames, [expect], `${path} should push once`);
+    }
+    viewer.close();
+  } finally { await h.stop(); }
+});
