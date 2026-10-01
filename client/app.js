@@ -5,6 +5,7 @@
 import { winningCells, bestLineOf, FREE, FREE_CELL, ITEM_COUNT } from "/shared/board.js";
 import { checkItems, validateCharName, ITEM_MAX, ITEM_SOFT_MAX, CHAT_MAX } from "/shared/validate.js";
 import { timeline } from "/shared/timeline.js";
+import { apiRequest } from "/shared/request.js";
 
 const S = window.__RB__ ?? { view: "login", returnTo: "/" };
 const root = document.getElementById("app");
@@ -30,11 +31,7 @@ const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", min
 const day = (ms) => new Date(ms).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
 
 async function api(path, body, method = "POST") {
-  const res = await fetch(path, {
-    method,
-    headers: body ? { "content-type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const res = await fetch(path, apiRequest(body, method));
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data?.error?.message ?? "Something went wrong."), { detail: data?.error ?? {} });
   return data;
@@ -879,7 +876,8 @@ function renderBoard() {
       } }, "Copy link"),
       owner && !game.closed ? h("button", { class: "btn quiet sm", onclick: async () => {
         if (!confirm("Close this game? No more squares can be called.")) return;
-        await api(`/api/games/${game.id}/close`); location.reload();
+        try { await api(`/api/games/${game.id}/close`); location.reload(); }
+        catch (e) { toast(e.message, { kind: "warn" }); }
       } }, "Close game") : null),
     callbar,
     h("div", { class: "layout" },

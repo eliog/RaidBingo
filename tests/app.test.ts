@@ -7,6 +7,7 @@ import { derivePid } from "../server/identity.ts";
 import { testConfig, fakeDiscord, items, T0 } from "./helpers.ts";
 import { SESSION_COOKIE, OAUTH_COOKIE } from "../server/auth.ts";
 import { LOOKUP_MISSES, LOOKUP_WINDOW_MS } from "../server/routes.ts";
+import { apiRequest } from "../shared/request.ts";
 
 function app(discordUserId = "1099") {
   const repo = createRepository(openDatabase(":memory:"));
@@ -534,4 +535,34 @@ test("renaming a closed game over the api is a 409 (#14)", async () => {
   const late = await rename("Rewritten");
   assert.equal(late.statusCode, 409);
   assert.equal((late.json() as { error: { code: string } }).error.code, "closed");
+});
+
+test("Close game works when sent exactly the way the browser sends it (#19)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie },
+    payload: { title: "Tuesday BT run", items: items() } });
+  const id = (made.json() as { id: string }).id;
+
+  // The client's api() builds every request with apiRequest(); this is the close.
+  const req = apiRequest();
+  const res = await h.instance.inject({ method: req.method as "POST", url: `/api/games/${id}/close`,
+    headers: { ...req.headers, cookie }, payload: req.body ?? "" });
+  assert.equal(res.statusCode, 200);
+  assert.notEqual((await h.repo.getGame(id))?.closedAt, null, "the game is actually closed");
+
+  // The guard it tripped is still there for anything that isn't JSON.
+  const bare = await h.instance.inject({ method: "POST", url: `/api/games/${id}/close`, headers: { cookie } });
+  assert.equal(bare.statusCode, 415);
+});
+
+test("the client gets its request builder from /shared, and uses it (#19)", async () => {
+  const h = app();
+  const mod = await h.instance.inject({ method: "GET", url: "/shared/request.js" });
+  assert.equal(mod.statusCode, 200);
+  assert.ok(mod.body.includes("export function apiRequest"));
+  const client = await h.instance.inject({ method: "GET", url: "/assets/app.js" });
+  assert.match(client.body, /import \{ apiRequest \} from "\/shared\/request\.js"/);
+  assert.match(client.body, /fetch\(path, apiRequest\(body, method\)\)/);
+  assert.equal(client.body.match(/\bfetch\(/g)?.length, 1, "every request goes through api()");
 });
