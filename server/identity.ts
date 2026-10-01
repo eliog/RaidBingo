@@ -51,21 +51,31 @@ export function safeReturnTo(returnTo: unknown): string {
     ? returnTo : "/";
 }
 
+/** Goes in a short-lived cookie at login and in the state, which must match. */
+export function newStateNonce(): string {
+  return randomBytes(16).toString("base64url");
+}
+
 /**
  * The OAuth `state` parameter, signed so the callback can trust it, and
- * carrying the deep link the player originally clicked.
+ * carrying the deep link the player originally clicked. The nonce ties it to
+ * the browser that started the login: a signature alone proves we issued the
+ * state, not that this browser asked for it.
  */
-export function signState(returnTo: string, secret: string, now: number): string {
+export function signState(returnTo: string, secret: string, now: number, nonce: string): string {
   const safe = safeReturnTo(returnTo);
-  const body = b64u(JSON.stringify({ returnTo: safe, issuedAt: now, nonce: randomBytes(9).toString("base64url") } satisfies StatePayload));
+  const body = b64u(JSON.stringify({ returnTo: safe, issuedAt: now, nonce } satisfies StatePayload));
   const sig = createHmac("sha256", secret).update(body, "utf8").digest("base64url");
   return `${body}.${sig}`;
 }
 
 export const STATE_MAX_AGE_MS = 10 * 60 * 1000;
 
-/** Returns the return path, or null if the state was forged, mangled or stale. */
-export function verifyState(state: string, secret: string, now: number): string | null {
+/**
+ * Returns the return path, or null if the state was forged, mangled, stale,
+ * or started in a browser other than the one holding `nonce`.
+ */
+export function verifyState(state: string, secret: string, now: number, nonce: string): string | null {
   const dot = state.indexOf(".");
   if (dot < 1) return null;
   const body = state.slice(0, dot);
@@ -85,5 +95,9 @@ export function verifyState(state: string, secret: string, now: number): string 
   if (typeof payload.issuedAt !== "number") return null;
   if (now - payload.issuedAt > STATE_MAX_AGE_MS) return null;
   if (now + 60_000 < payload.issuedAt) return null; // issued in the future
+  if (typeof payload.nonce !== "string" || nonce === "") return null;
+  const mine = Buffer.from(nonce, "utf8");
+  const theirs = Buffer.from(payload.nonce, "utf8");
+  if (mine.length !== theirs.length || !timingSafeEqual(mine, theirs)) return null;
   return safeReturnTo(payload.returnTo);
 }

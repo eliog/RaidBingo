@@ -5,7 +5,7 @@ import { createRepository, openDatabase } from "../server/db.ts";
 import { fixedClock, seededRng } from "../shared/seams.ts";
 import { derivePid } from "../server/identity.ts";
 import { testConfig, fakeDiscord, items, T0 } from "./helpers.ts";
-import { SESSION_COOKIE } from "../server/auth.ts";
+import { SESSION_COOKIE, OAUTH_COOKIE } from "../server/auth.ts";
 import { LOOKUP_MISSES, LOOKUP_WINDOW_MS } from "../server/routes.ts";
 
 function app(discordUserId = "1099") {
@@ -27,7 +27,8 @@ async function signIn(h: ReturnType<typeof app>, discordUserId = "1099"): Promis
   const login = await h.instance.inject({ method: "GET", url: "/auth/login?returnTo=%2F" });
   const state = new URL(login.headers["location"] as string).searchParams.get("state") as string;
   h.discord.exchangeCode = async () => ({ discordUserId });
-  const cb = await h.instance.inject({ method: "GET", url: `/auth/callback?code=abc&state=${encodeURIComponent(state)}` });
+  const cb = await h.instance.inject({ method: "GET", url: `/auth/callback?code=abc&state=${encodeURIComponent(state)}`,
+    headers: { cookie: cookieFrom(login.headers["set-cookie"]) } });
   assert.equal(cb.statusCode, 302);
   return cookieFrom(cb.headers["set-cookie"]);
 }
@@ -85,7 +86,8 @@ test("the callback creates a session and returns you to where you started", asyn
   const h = app();
   const login = await h.instance.inject({ method: "GET", url: "/auth/login?returnTo=%2Fnew" });
   const state = new URL(login.headers["location"] as string).searchParams.get("state") as string;
-  const res = await h.instance.inject({ method: "GET", url: `/auth/callback?code=xyz&state=${encodeURIComponent(state)}` });
+  const res = await h.instance.inject({ method: "GET", url: `/auth/callback?code=xyz&state=${encodeURIComponent(state)}`,
+    headers: { cookie: cookieFrom(login.headers["set-cookie"]) } });
 
   assert.equal(res.statusCode, 302);
   assert.equal(res.headers["location"], "/new");
@@ -492,4 +494,29 @@ test("hits never count, so a busy player is never limited (#9)", async () => {
   for (let i = 0; i < LOOKUP_MISSES * 3; i++) {
     assert.equal((await h.instance.inject({ method: "GET", url: `/api/games/${id}`, headers: { cookie } })).statusCode, 200);
   }
+});
+
+test("a callback link only works in the browser that started the login (#10)", async () => {
+  const h = app();
+  // The attacker starts a login in their own browser and stops at the callback.
+  const theirs = await h.instance.inject({ method: "GET", url: "/auth/login?returnTo=%2F" });
+  const state = new URL(theirs.headers["location"] as string).searchParams.get("state") as string;
+  const theirCookie = cookieFrom(theirs.headers["set-cookie"]);
+  assert.match(theirs.headers["set-cookie"] as string, /Path=\/auth\/callback; HttpOnly; SameSite=Lax; Max-Age=600; Secure/);
+  const callback = `/auth/callback?code=attacker&state=${encodeURIComponent(state)}`;
+
+  // The victim opens that link: no nonce cookie, or one from their own login.
+  const mine = await h.instance.inject({ method: "GET", url: "/auth/login?returnTo=%2F" });
+  for (const cookie of [undefined, cookieFrom(mine.headers["set-cookie"]), `${OAUTH_COOKIE}=`]) {
+    const res = await h.instance.inject({ method: "GET", url: callback, headers: cookie ? { cookie } : {} });
+    assert.equal(res.statusCode, 400, String(cookie));
+    assert.equal(res.headers["set-cookie"], undefined, "no session was issued");
+  }
+
+  // In the browser that started it, it works once, and clears the nonce.
+  const ok = await h.instance.inject({ method: "GET", url: callback, headers: { cookie: theirCookie } });
+  assert.equal(ok.statusCode, 302);
+  const set = ok.headers["set-cookie"] as string[];
+  assert.match(set[0] as string, new RegExp(`^${SESSION_COOKIE}=`));
+  assert.match(set[1] as string, new RegExp(`^${OAUTH_COOKIE}=; Path=/auth/callback;.*Max-Age=0`));
 });

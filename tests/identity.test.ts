@@ -7,6 +7,7 @@ import {
 
 const SECRET = "a".repeat(64);
 const OTHER = "b".repeat(64);
+const NONCE = "n0nce-from-the-login-cookie";
 
 test("the same Discord account always derives the same pid", () => {
   // This is the property that makes logging in from a new device restore your
@@ -37,35 +38,35 @@ test("session tokens are unique and stored only as a hash", () => {
 
 test("state round-trips the path the player originally clicked", () => {
   const now = 1_700_000_000_000;
-  const state = signState("/g/wyrm-lantern-ward", SECRET, now);
-  assert.equal(verifyState(state, SECRET, now + 1000), "/g/wyrm-lantern-ward");
+  const state = signState("/g/wyrm-lantern-ward", SECRET, now, NONCE);
+  assert.equal(verifyState(state, SECRET, now + 1000, NONCE), "/g/wyrm-lantern-ward");
 });
 
 test("state signed with another secret is rejected", () => {
   const now = Date.now();
-  assert.equal(verifyState(signState("/", OTHER, now), SECRET, now), null);
+  assert.equal(verifyState(signState("/", OTHER, now, NONCE), SECRET, now, NONCE), null);
 });
 
 test("a tampered state is rejected", () => {
   const now = Date.now();
-  const state = signState("/g/a-b-c", SECRET, now);
+  const state = signState("/g/a-b-c", SECRET, now, NONCE);
   const [body, sig] = state.split(".") as [string, string];
-  assert.equal(verifyState(`${body}x.${sig}`, SECRET, now), null);
-  assert.equal(verifyState(`${body}.${sig}x`, SECRET, now), null);
-  assert.equal(verifyState("garbage", SECRET, now), null);
+  assert.equal(verifyState(`${body}x.${sig}`, SECRET, now, NONCE), null);
+  assert.equal(verifyState(`${body}.${sig}x`, SECRET, now, NONCE), null);
+  assert.equal(verifyState("garbage", SECRET, now, NONCE), null);
 });
 
 test("an expired state is rejected, so a stale login link cannot be replayed", () => {
   const now = Date.now();
-  const state = signState("/", SECRET, now);
-  assert.equal(verifyState(state, SECRET, now + STATE_MAX_AGE_MS + 1), null);
+  const state = signState("/", SECRET, now, NONCE);
+  assert.equal(verifyState(state, SECRET, now + STATE_MAX_AGE_MS + 1, NONCE), null);
 });
 
 test("an absolute url in returnTo is downgraded to the site root", () => {
   const now = Date.now();
   // An open redirect would let a game link carry someone off-site after login.
-  assert.equal(verifyState(signState("https://evil.example/x", SECRET, now), SECRET, now), "/");
-  assert.equal(verifyState(signState("//evil.example/x", SECRET, now), SECRET, now), "/");
+  assert.equal(verifyState(signState("https://evil.example/x", SECRET, now, NONCE), SECRET, now, NONCE), "/");
+  assert.equal(verifyState(signState("//evil.example/x", SECRET, now, NONCE), SECRET, now, NONCE), "/");
 });
 
 test("returnTo values a browser would resolve off-site are downgraded to the root (#6)", () => {
@@ -74,13 +75,22 @@ test("returnTo values a browser would resolve off-site are downgraded to the roo
   const hostile = ["/\\evil.example", "/\\/evil.example", "/\t/evil.example", "/\n/evil.example",
     "\\\\evil.example", "/ /evil.example", "/x\\y", "/x\r\ny", "javascript:alert(1)", ""];
   for (const rt of hostile) {
-    const back = verifyState(signState(rt, SECRET, now), SECRET, now);
+    const back = verifyState(signState(rt, SECRET, now, NONCE), SECRET, now, NONCE);
     assert.equal(back, "/", JSON.stringify(rt));
   }
   // The guard is about where a browser lands, so check that directly too.
   for (const rt of hostile) assert.equal(new URL(safeReturnTo(rt), base).origin, base, JSON.stringify(rt));
 
   for (const rt of ["/", "/new", "/g/wyrm-lantern-ward", "/%2F/stays-here", "/g/a-b-c?x=1"]) {
-    assert.equal(verifyState(signState(rt, SECRET, now), SECRET, now), rt);
+    assert.equal(verifyState(signState(rt, SECRET, now, NONCE), SECRET, now, NONCE), rt);
+  }
+});
+
+test("a state only verifies with the nonce it was issued with (#10)", () => {
+  const now = Date.now();
+  const state = signState("/new", SECRET, now, NONCE);
+  assert.equal(verifyState(state, SECRET, now, NONCE), "/new");
+  for (const other of ["", "someone-elses-nonce", NONCE + "x", NONCE.slice(1)]) {
+    assert.equal(verifyState(state, SECRET, now, other), null, JSON.stringify(other));
   }
 });

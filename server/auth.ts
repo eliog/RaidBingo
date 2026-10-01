@@ -9,7 +9,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Deps } from "./app.ts";
 import {
-  derivePid, newSessionToken, hashSessionToken, signState, verifyState, SESSION_MS,
+  derivePid, newSessionToken, hashSessionToken, signState, verifyState, newStateNonce,
+  SESSION_MS, STATE_MAX_AGE_MS,
 } from "./identity.ts";
 import { DiscordError } from "./discord.ts";
 import { errorPage } from "./html.ts";
@@ -41,6 +42,16 @@ function setSessionCookie(reply: FastifyReply, token: string, secure: boolean): 
   reply.header("set-cookie", bits.join("; "));
 }
 
+/** Holds the login nonce between /auth/login and the callback, and nowhere else. */
+export const OAUTH_COOKIE = "rb_oauth";
+
+function setOauthCookie(reply: FastifyReply, value: string, maxAgeS: number, secure: boolean): void {
+  // Lax still sends it on the top-level redirect back from discord.com.
+  const bits = [`${OAUTH_COOKIE}=${value}`, "Path=/auth/callback", "HttpOnly", "SameSite=Lax", `Max-Age=${maxAgeS}`];
+  if (secure) bits.push("Secure");
+  reply.header("set-cookie", bits.join("; "));
+}
+
 function clearSessionCookie(reply: FastifyReply, secure: boolean): void {
   const bits = [`${SESSION_COOKIE}=`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=0"];
   if (secure) bits.push("Secure");
@@ -63,7 +74,9 @@ export function registerAuthRoutes(app: FastifyInstance, deps: Deps): void {
 
   app.get("/auth/login", async (request, reply) => {
     const returnTo = String((request.query as Record<string, unknown>)["returnTo"] ?? "/");
-    const state = signState(returnTo, deps.config.sessionSecret, deps.clock.now());
+    const nonce = newStateNonce();
+    setOauthCookie(reply, nonce, Math.floor(STATE_MAX_AGE_MS / 1000), secure);
+    const state = signState(returnTo, deps.config.sessionSecret, deps.clock.now(), nonce);
     return reply.redirect(deps.discord.authorizeUrl(state), 302);
   });
 
@@ -85,10 +98,14 @@ export function registerAuthRoutes(app: FastifyInstance, deps: Deps): void {
       );
     }
 
-    const returnTo = verifyState(state, deps.config.sessionSecret, deps.clock.now());
+    // Without the nonce cookie this browser never started this login: someone
+    // else's callback link would otherwise sign the player in as them.
+    const nonce = parseCookies(request.headers.cookie)[OAUTH_COOKIE] ?? "";
+    const returnTo = verifyState(state, deps.config.sessionSecret, deps.clock.now(), nonce);
     if (returnTo === null) {
       return reply.type("text/html").code(400).send(
-        errorPage("That sign-in expired", "Sign-in links are good for ten minutes. Try again.", "/"),
+        errorPage("That sign-in expired",
+          "Sign-in links are good for ten minutes, in the browser that started them. Try again.", "/"),
       );
     }
 
@@ -121,6 +138,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: Deps): void {
     });
 
     setSessionCookie(reply, token, secure);
+    setOauthCookie(reply, "", 0, secure);       // single use
     return reply.redirect(returnTo, 302);
   });
 
