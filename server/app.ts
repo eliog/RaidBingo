@@ -57,6 +57,11 @@ export function buildApp(deps: Deps): FastifyInstance {
     // nothing may keep a copy: no shared cache, and no back button showing a
     // board after logout. The few public files set their own and keep it.
     if (!reply.hasHeader("cache-control")) reply.header("cache-control", "no-store");
+    // No cross-origin window keeps a handle on ours (login is a full-page
+    // redirect to Discord, not a popup), and no other site may embed our
+    // responses — except the preview image, which sets its own.
+    reply.header("cross-origin-opener-policy", "same-origin");
+    if (!reply.hasHeader("cross-origin-resource-policy")) reply.header("cross-origin-resource-policy", "same-origin");
     reply.header("x-content-type-options", "nosniff");
     reply.header("referrer-policy", "strict-origin-when-cross-origin");
     reply.header("x-frame-options", "DENY");

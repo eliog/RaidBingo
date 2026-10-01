@@ -869,3 +869,38 @@ test("the client reads the state block, not a global (#26)", async () => {
   // And no inline handlers baked into markup the client builds.
   assert.ok(!/\bon[a-z]+="/i.test(client.body), "an inline on…= attribute would be blocked by the policy");
 });
+
+test("every response isolates its window and resources; only the preview image is shareable (#28)", async () => {
+  const h = app();
+  const cookie = await signIn(h, "1");
+  const made = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie },
+    payload: { title: "Tuesday BT run", items: items() } });
+  const id = (made.json() as { id: string }).id;
+  const get = (url: string, signedIn = true) =>
+    h.instance.inject({ method: "GET", url, headers: signedIn ? { cookie } : {} });
+
+  const responses = [
+    ["create (api)", made], ["lobby", await get("/")], ["signed-out root", await get("/", false)],
+    ["board", await get(`/g/${id}`)], ["api", await get(`/api/games/${id}`)],
+    ["api 401", await get(`/api/games/${id}`, false)], ["no such game", await get("/g/wyrm-lantern-ward")],
+    ["stylesheet", await get("/assets/app.css", false)], ["client", await get("/assets/app.js", false)],
+    ["shared module", await get("/shared/board.js", false)], ["login redirect", await get("/auth/login", false)],
+    ["missing preview", await get("/og/wyrm-lantern-ward.png", false)],
+  ] as const;
+  for (const [what, res] of responses) {
+    assert.equal(res.headers["cross-origin-opener-policy"], "same-origin", what);
+    assert.equal(res.headers["cross-origin-resource-policy"], "same-origin", what);
+  }
+
+  // Discord, and whatever shows the unfurl, has to be able to load this one.
+  const png = await get(`/og/${id}.png`, false);
+  assert.equal(png.statusCode, 200);
+  assert.equal(png.headers["cross-origin-resource-policy"], "cross-origin");
+  assert.equal(png.headers["cache-control"], "public, max-age=300", "unchanged");
+
+  // The headers that were already there are still there.
+  const page = await get("/");
+  for (const h of ["content-security-policy", "x-frame-options", "x-content-type-options", "referrer-policy", "strict-transport-security"]) {
+    assert.ok(page.headers[h], h);
+  }
+});

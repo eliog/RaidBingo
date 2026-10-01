@@ -243,6 +243,8 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
     return reply
       .type("image/png")
       .header("cache-control", "public, max-age=300")
+      // Discord and anything showing the unfurl load this from another origin.
+      .header("cross-origin-resource-policy", "cross-origin")
       .send(await ogPng(state));
   });
 
