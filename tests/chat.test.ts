@@ -36,24 +36,39 @@ test("a message must be a string", () => {
 
 test("a message is normalised to NFC", () => {
   // e + combining acute is the same letter as the precomposed é.
-  assert.equal(textOf(validateMessage("café")), "café");
+  assert.equal(textOf(validateMessage("cafe\u0301")), "café");
 });
 
 test("invisible and direction-spoofing characters are stripped", () => {
-  assert.equal(textOf(validateMessage("a​b﻿c")), "abc");
-  assert.equal(textOf(validateMessage("‮gnp.exe")), "gnp.exe");
-  assert.equal(textOf(validateMessage("x⁦y⁩z")), "xyz");
+  assert.equal(textOf(validateMessage("a\u200Bb\uFEFFc")), "abc");
+  assert.equal(textOf(validateMessage("\u202Egnp.exe")), "gnp.exe");
+  assert.equal(textOf(validateMessage("x\u2066y\u2069z")), "xyz");
   assert.equal(textOf(validateMessage("bell\u0007 and del\u007F")), "bell and del");
 });
 
+test("the zero-width joiners stay, or multi-part emoji fall apart", () => {
+  const wizard = "\u{1F9D9}\u200D\u2642\uFE0F pulled";       // 🧙‍♂️
+  const rainbow = "\u{1F3F3}\uFE0F\u200D\u{1F308}";          // 🏳️‍🌈
+  const persian = "\u0645\u06CC\u200C\u062E\u0648\u0627\u0647\u0645"; // the non-joiner shapes words
+  for (const raw of [wizard, rainbow, persian]) assert.equal(textOf(validateMessage(raw)), raw);
+});
+
+test("the rest of the invisible and bidi set is stripped", () => {
+  assert.equal(textOf(validateMessage("a\u061Cb\u2060c\u2064d\u200Ee\u200Ff")), "abcdef");
+});
+
+test("NEL is a line break: it becomes a space, not glue", () => {
+  assert.equal(textOf(validateMessage("wipe\u0085again")), "wipe again");
+});
+
 test("chat is single-line: every kind of break collapses to one space", () => {
-  assert.equal(textOf(validateMessage("  wipe\n\nagain\r\nlol ok\tyes  ")), "wipe again lol ok yes");
+  assert.equal(textOf(validateMessage("  wipe\n\nagain\r\nlol\u2028ok\tyes  ")), "wipe again lol ok yes");
 });
 
 test("an empty or invisible-only message is refused", () => {
   assert.equal(validateMessage("").ok, false);
   assert.equal(validateMessage("   \n ").ok, false);
-  assert.equal(validateMessage("​‍").ok, false);
+  assert.equal(validateMessage("\u200B\u2060\uFEFF").ok, false);
 });
 
 test("the cap is counted in code units, the unit maxlength uses", () => {
@@ -275,4 +290,16 @@ test("a bingo's time is exactly the time of the call that completed it", async (
   const calls = await h.repo.callsFor(h.gameId);
   const won = await h.repo.getGamePlayer(h.gameId, ALICE);
   assert.equal(won?.bingoAt, calls.get(row[4]!));
+});
+
+test("the limiter forgets keys whose window has passed", async () => {
+  const { RateLimiter } = await import("../server/rate-limit.ts");
+  const { fixedClock } = await import("../shared/seams.ts");
+  const clock = fixedClock(T0);
+  const limiter = new RateLimiter(clock, CHAT_BURST, CHAT_WINDOW_MS);
+  for (let i = 0; i < 50; i++) limiter.check(`game-${i}:pid`);
+  assert.equal(limiter.size, 50);
+  clock.advance(CHAT_WINDOW_MS);
+  limiter.check("tonight:pid");
+  assert.equal(limiter.size, 1, "last night's keys should be gone");
 });

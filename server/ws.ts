@@ -32,10 +32,13 @@ export interface LivePayload {
 export class GameHub {
   readonly #rooms = new Map<string, Set<WebSocket>>();
   readonly #deps: Deps;
+  /** The only Origin a browser handshake may carry. */
+  readonly #origin: string;
   #server: WebSocketServer | null = null;
 
   constructor(deps: Deps) {
     this.#deps = deps;
+    this.#origin = new URL(deps.config.baseUrl).origin;
   }
 
   attach(httpServer: Server): void {
@@ -54,7 +57,7 @@ export class GameHub {
         // Origin on a socket handshake, so a cross-site page is refused here
         // even if a cookie somehow rode along. Non-browser clients send none.
         const origin = request.headers.origin;
-        if (origin !== undefined && origin !== new URL(this.#deps.config.baseUrl).origin) {
+        if (origin !== undefined && origin !== this.#origin) {
           return socket.destroy();
         }
 
@@ -123,7 +126,13 @@ export class GameHub {
       closed: game.closedAt !== null,
     };
 
-    const text = JSON.stringify(payload);
+    this.#broadcast(gameId, JSON.stringify(payload));
+  }
+
+  /** Serialised once by the caller, sent to every open socket in the room. */
+  #broadcast(gameId: string, text: string): void {
+    const room = this.#rooms.get(gameId);
+    if (room === undefined) return;
     for (const ws of room) {
       if (ws.readyState === ws.OPEN) ws.send(text);
     }
@@ -135,12 +144,7 @@ export class GameHub {
    * 100 bytes per client.
    */
   sendChat(gameId: string, message: MessageView): void {
-    const room = this.#rooms.get(gameId);
-    if (room === undefined) return;
-    const text = JSON.stringify({ type: "chat", message });
-    for (const ws of room) {
-      if (ws.readyState === ws.OPEN) ws.send(text);
-    }
+    this.#broadcast(gameId, JSON.stringify({ type: "chat", message }));
   }
 
   /**

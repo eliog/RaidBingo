@@ -492,7 +492,7 @@ function renderBoard() {
       rosterBody.append(row);
     }
 
-    drawChat();
+    drawChatIfChanged();
     fit();
   }
 
@@ -501,16 +501,35 @@ function renderBoard() {
   // Keyed by seq, so a catch-up and a live frame that overlap merge harmlessly.
   const chat = new Map();
   let chatLoaded = false, loadingOlder = false, reachedStart = false;
-  const lowestSeq = () => (chat.size ? Math.min(...chat.keys()) : 0);
-  const highestSeq = () => (chat.size ? Math.max(...chat.keys()) : 0);
+  let lowSeq = Infinity, highSeq = 0;
   // seq is gap-free from 1, so holding 1 means holding the start of the chat.
   const complete = () => chat.has(1) || reachedStart || (chatLoaded && chat.size === 0);
 
+  // What, besides messages, the chat draws: when this is unchanged, a state
+  // push leaves the chat alone instead of rebuilding it.
+  let drawnKey = null;
+  const eventKey = () => JSON.stringify([[...called.entries()],
+    game.roster.map((r) => [r.charName, r.bingoAt]), mayCall, game.closed]);
+
+  function messageRow(e) {
+    return h("div", { class: `msg ${e.charName === game.charName ? "me" : ""}` },
+      h("time", { text: clock(e.at) }),
+      h("span", { class: "who", text: e.charName }),
+      h("span", { text: e.text }));
+  }
+
+  const isPinned = () => chatBody.scrollHeight - chatBody.scrollTop - chatBody.clientHeight < 8;
+
+  /**
+   * A full rebuild. Only when calls, bingos or callers change, or older
+   * history arrives: a new message is appended instead (appendMessage), so a
+   * screen reader hears the new line rather than the whole log again.
+   */
   function drawChat({ keepOffset = false } = {}) {
-    const fromBottom = chatBody.scrollHeight - chatBody.scrollTop - chatBody.clientHeight;
-    const pinned = fromBottom < 8;
+    const pinned = isPinned();
     const events = timeline([...called.entries()], game.roster, [...chat.values()], complete());
 
+    chatBody.setAttribute("aria-busy", "true");
     clear(chatBody);
     if (!complete() && chat.size) {
       chatBody.append(h("button", { class: "btn quiet sm older", onclick: loadOlder }, "Earlier messages"));
@@ -519,10 +538,7 @@ function renderBoard() {
       game.closed ? "Nobody said anything this time." : "Nothing yet tonight. Say something."));
     for (const e of events) {
       if (e.kind === "message") {
-        chatBody.append(h("div", { class: `msg ${e.charName === game.charName ? "me" : ""}` },
-          h("time", { text: clock(e.at) }),
-          h("span", { class: "who", text: e.charName }),
-          h("span", { text: e.text })));
+        chatBody.append(messageRow(e));
       } else if (e.kind === "call") {
         chatBody.append(h("div", { class: "ev" },
           h("span", { class: "what", text: `Called: ${game.items[e.item]}` }),
@@ -535,6 +551,8 @@ function renderBoard() {
           h("span", { text: clock(e.at) })));
       }
     }
+    drawnKey = eventKey();
+    chatBody.removeAttribute("aria-busy");
 
     // Older history goes on top without moving what the reader is looking at;
     // otherwise follow the conversation unless they have scrolled up to read.
@@ -542,15 +560,50 @@ function renderBoard() {
     else if (pinned) chatBody.scrollTop = chatBody.scrollHeight;
   }
 
-  function mergeChat(messages) {
-    for (const m of messages) chat.set(m.seq, m);
+  /** From draw(): rebuild only if something the chat shows actually changed. */
+  function drawChatIfChanged() {
+    if (eventKey() !== drawnKey) drawChat();
   }
 
-  /** On every socket open: first load, a blip and a restart are the same path. */
+  function mergeChat(messages) {
+    for (const m of messages) {
+      chat.set(m.seq, m);
+      lowSeq = Math.min(lowSeq, m.seq);
+      highSeq = Math.max(highSeq, m.seq);
+    }
+  }
+
+  /** A live message: newer than anything held, so it belongs at the bottom. */
+  function appendMessage(m) {
+    const fresh = m.seq > highSeq && chat.size > 0 && drawnKey !== null;
+    mergeChat([m]);
+    if (!fresh) { drawChat(); return; }
+    const pinned = isPinned();
+    chatBody.append(messageRow(m));
+    if (pinned) chatBody.scrollTop = chatBody.scrollHeight;
+  }
+
+  /**
+   * On every socket open: first load, a blip and a restart are the same path.
+   * `after` returns the NEWEST page past the cursor, so after a long absence
+   * there can be a hole between what was held and that page. Fill it by paging
+   * back from the new page until it meets what was already held: every message
+   * is reachable, and none is silently skipped.
+   */
   async function catchUp() {
     try {
-      const { messages } = await api(`/api/games/${game.id}/chat?after=${highestSeq()}`, null, "GET");
+      const firstLoad = !chatLoaded;
+      const held = highSeq;
+      const { messages } = await api(`/api/games/${game.id}/chat?after=${held}`, null, "GET");
       mergeChat(messages);
+      // First load wants only the latest page; older history is a scroll away.
+      let low = messages[0]?.seq ?? held + 1;
+      for (let pages = 0; !firstLoad && low > held + 1 && pages < 30; pages++) {
+        const { messages: back } = await api(`/api/games/${game.id}/chat?before=${low}`, null, "GET");
+        if (!back.length) break;
+        mergeChat(back);
+        low = back[0].seq;
+      }
       chatLoaded = true;
       drawChat();
     } catch { /* the next open tries again */ }
@@ -560,7 +613,7 @@ function renderBoard() {
     if (loadingOlder || complete() || !chat.size) return;
     loadingOlder = true;
     try {
-      const { messages } = await api(`/api/games/${game.id}/chat?before=${lowestSeq()}`, null, "GET");
+      const { messages } = await api(`/api/games/${game.id}/chat?before=${lowSeq}`, null, "GET");
       const offset = chatBody.scrollHeight - chatBody.scrollTop;
       mergeChat(messages);
       // Gap-free seq means an empty page only comes at the start, but never
@@ -584,7 +637,12 @@ function renderBoard() {
       // everyone else's, so there is one ordering for everybody.
       await api(`/api/games/${game.id}/chat`, { text });
       chatInput.value = "";
-    } catch (e) { toast(e.message, { kind: "warn" }); }
+    } catch (e) {
+      toast(e.message, { kind: "warn" });
+      // The game closed under us (idle); the state push follows, but do not
+      // leave a live-looking input in the meantime.
+      if (e.detail?.code === "closed") composer.hidden = true;
+    }
     finally { chatSend.disabled = false; chatInput.focus(); }
   }
   chatSend.addEventListener("click", postChat);
@@ -733,7 +791,7 @@ function renderBoard() {
     socket.addEventListener("message", (ev) => {
       const msg = JSON.parse(ev.data);
       if (msg.type === "goodbye") { restarting = true; setConn("down", "Restarting — back in a moment"); return; }
-      if (msg.type === "chat") { mergeChat([msg.message]); drawChat(); return; }
+      if (msg.type === "chat") { appendMessage(msg.message); return; }
       if (msg.type !== "state") return;
       // Full state replaces local state; deltas are never merged across a gap.
       called = new Map(msg.called);

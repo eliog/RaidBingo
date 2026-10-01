@@ -64,11 +64,17 @@ export const CHAT_MAX = 300;
 
 /**
  * Characters that render as nothing or rearrange what is around them: C0 and
- * C1 controls and DEL, zero-width characters, and bidi embeddings, overrides
- * and isolates. Stripped rather than refused — a stray one from a paste
- * should not cost someone their message.
+ * C1 controls and DEL, the zero-width space, word joiner and invisible
+ * operators, BOM, and every bidi mark, embedding, override and isolate.
+ * Stripped rather than refused — a stray one from a paste should not cost
+ * someone their message.
+ *
+ * U+200C and U+200D (the zero-width non-joiner and joiner) are deliberately
+ * kept: the joiner is what holds 🧙‍♂️ and 🏳️‍🌈 together, and both shape real
+ * text in several scripts.
  */
-const INVISIBLE = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\uFEFF\u202A-\u202E\u2066-\u2069]/g;
+const INVISIBLE =
+  /[\u0000-\u001F\u007F-\u009F\u061C\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g;
 
 /**
  * There is deliberately no blocklist of code-looking text: `<3` and `>inv`
@@ -80,7 +86,7 @@ export function validateMessage(raw: unknown): Result<string> {
     .normalize("NFC")
     // Line and paragraph separators, tabs and newlines become spaces before
     // the strip, so a pasted two-liner keeps its word break.
-    .replace(/[\t\n\v\f\r\u2028\u2029]/g, " ")
+    .replace(/[\t\n\v\f\r\u0085\u2028\u2029]/g, " ")
     .replace(INVISIBLE, "")
     .replace(/\s+/g, " ")
     .trim();

@@ -304,6 +304,9 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
       if (pid === null) return reply;
       // The body carries only text; the sender is whoever the session says.
       const posted = await service.postMessage(request.params.id, pid, (request.body ?? {}).text);
+      // An idle game closes lazily, on the post that finds it quiet. Nothing
+      // else would tell the open boards, so tell them now.
+      if (!posted.ok && posted.error.code === "closed") notifyGame(request.params.id);
       if (!posted.ok) return fail(reply, posted.error);
       notifyChat(request.params.id, posted.value);
       return reply.send({ message: posted.value });

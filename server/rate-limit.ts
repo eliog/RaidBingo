@@ -19,6 +19,7 @@ export class RateLimiter {
   /** Records the attempt. Returns null when allowed, or seconds to wait. */
   check(key: string): number | null {
     const now = this.#clock.now();
+    this.#prune(now);
     const recent = (this.#hits.get(key) ?? []).filter((t) => now - t < this.#windowMs);
     if (recent.length >= this.#limit) {
       const oldest = recent[0] as number;
@@ -28,5 +29,25 @@ export class RateLimiter {
     recent.push(now);
     this.#hits.set(key, recent);
     return null;
+  }
+
+  #lastPrune = 0;
+
+  /**
+   * Keys are per player (and, for chat, per game), so without this every game
+   * night would leave entries behind until the next restart. Once a window,
+   * drop any key whose newest hit has aged out.
+   */
+  #prune(now: number): void {
+    if (now - this.#lastPrune < this.#windowMs) return;
+    this.#lastPrune = now;
+    for (const [key, hits] of this.#hits) {
+      const newest = hits.at(-1);
+      if (newest === undefined || now - newest >= this.#windowMs) this.#hits.delete(key);
+    }
+  }
+
+  get size(): number {
+    return this.#hits.size;
   }
 }
