@@ -128,6 +128,10 @@ Three distinct words from a curated pool of ~512 WoW words, e.g.
   reaches the client, `char_name` is the only identity anyone sees: two players called
   Thalgrim would make the roster, the bingo call-out and the winner ranking ambiguous for
   the whole night. Blocking, with suggested alternatives checked against the roster first.
+- **"Looks the same" means the same name.** Names, titles and squares all go through
+  `cleanText` (NFC, controls and invisible characters stripped), and the key adds NFKC, so
+  a zero-width space or fullwidth letter cannot make a second Thalgrim. A name mixing Latin
+  with Cyrillic or Greek is refused. Free text keeps emoji joiners; names do not.
 
 ### Sessions
 

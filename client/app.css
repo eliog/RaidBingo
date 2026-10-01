@@ -250,6 +250,9 @@ textarea{min-height:160px;resize:vertical;line-height:1.5}
 .chat .ev.bingo{color:var(--fel);font-weight:700;font-style:normal}
 .chat .msg{padding:5px 14px;font-size:13.5px;overflow-wrap:anywhere}
 .chat .msg .who{font-family:Cinzel,Georgia,serif;font-weight:700;margin-right:7px}
+/* Names are stripped of bidi controls server-side; isolating them as well
+   means one could never reorder the message text beside it. */
+.chat .msg .who,.lrow .nm,.chip{unicode-bidi:isolate}
 .chat .msg.me .who{color:var(--fel)}
 .chat .msg time{float:right;margin-left:8px;font-size:11.5px;color:var(--ink-faint)}
 .chat .older{display:block;margin:2px auto 6px}

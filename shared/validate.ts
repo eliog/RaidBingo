@@ -28,9 +28,46 @@ export type Result<T> = Valid<T> | Invalid;
 const ok = <T,>(value: T): Valid<T> => ({ ok: true, value });
 const bad = (reason: string): Invalid => ({ ok: false, reason });
 
-/** Collapse runs of whitespace and trim. What gets displayed. */
+/**
+ * Characters that render as nothing or rearrange what is around them: every
+ * control (Cc) and format (Cf) character — which covers zero-width spaces,
+ * the soft hyphen, BOM, every bidi mark, embedding, override and isolate, and
+ * the tag block — plus the blank fillers and joiners that are letters or marks
+ * on paper but draw nothing: Hangul fillers, the braille blank, the combining
+ * grapheme joiner, Khmer inherent vowels, Mongolian selectors and the
+ * variation selectors.
+ *
+ * Stripped rather than refused: a stray one from a paste should not cost
+ * someone their message.
+ */
+const INVISIBLE =
+  /[\p{Cc}\p{Cf}\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180F\u2800\u3164\uFE00-\uFE0F\uFFA0\u{E0100}-\u{E01EF}]/gu;
+
+/**
+ * Kept in free text (chat, titles, squares), never in a name. The joiners
+ * hold 🧙‍♂️ and 🏳️‍🌈 together and shape real text in several scripts; U+FE0E and
+ * U+FE0F pick text or emoji style. A name has no use for any of them, and in
+ * a name they only make two identical-looking names count as different.
+ */
+const KEEP_IN_TEXT = new Set(["\u200C", "\u200D", "\uFE0E", "\uFE0F"]);
+
+/**
+ * The one clean-up for anything a player types that others will see: NFC,
+ * invisible characters out, whitespace collapsed. Line breaks and the other
+ * separators become spaces first, so a pasted two-liner keeps its word break.
+ */
+export function cleanText(raw: string, mode: "text" | "name" = "text"): string {
+  return raw
+    .normalize("NFC")
+    .replace(/[\t\n\v\f\r\u0085\u2028\u2029]/g, " ")
+    .replace(INVISIBLE, (c) => (mode === "text" && KEEP_IN_TEXT.has(c) ? c : ""))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Collapse runs of whitespace, strip the invisible, and trim. What gets displayed. */
 export function normalizeCharName(raw: string): string {
-  return raw.replace(/\s+/g, " ").trim();
+  return cleanText(raw, "name");
 }
 
 /**
@@ -40,7 +77,17 @@ export function normalizeCharName(raw: string): string {
  * `Thalgrim`, `thalgrim` and `Thal grim` are all the same person to this.
  */
 export function charNameKey(raw: string): string {
-  return normalizeCharName(raw).toLowerCase().replaceAll(" ", "");
+  // NFKC folds compatibility forms — fullwidth Ｔ, ligatures, superscripts —
+  // onto the letter they draw as.
+  return cleanText(normalizeCharName(raw).normalize("NFKC"), "name").toLowerCase().replaceAll(" ", "");
+}
+
+/**
+ * Latin next to Cyrillic or Greek in one name is how `Thаlgrim` (Cyrillic а)
+ * passes for `Thalgrim`. Each script alone is fine.
+ */
+function mixesLookalikeScripts(name: string): boolean {
+  return /\p{Script=Latin}/u.test(name) && /[\p{Script=Cyrillic}\p{Script=Greek}]/u.test(name);
 }
 
 export function validateCharName(raw: string): Result<string> {
@@ -49,12 +96,15 @@ export function validateCharName(raw: string): Result<string> {
   if (name.length > CHAR_NAME_MAX) {
     return bad(`Character names are at most ${CHAR_NAME_MAX} characters.`);
   }
-  if (charNameKey(name) === "") return bad("That name has no letters in it.");
+  if (!/[\p{L}\p{N}]/u.test(name)) return bad("That name has no letters in it.");
+  if (mixesLookalikeScripts(name)) {
+    return bad("That name mixes Latin letters with Cyrillic or Greek ones. Use one alphabet.");
+  }
   return ok(name);
 }
 
 export function validateTitle(raw: string): Result<string> {
-  const title = raw.replace(/\s+/g, " ").trim();
+  const title = cleanText(raw);
   if (title === "") return bad("Give the game a title — it's what people see in Discord.");
   if (title.length > TITLE_MAX) return bad(`Titles are at most ${TITLE_MAX} characters.`);
   return ok(title);
@@ -68,34 +118,13 @@ export function validateTitle(raw: string): Result<string> {
 export const CHAT_MAX = 300;
 
 /**
- * Characters that render as nothing or rearrange what is around them: C0 and
- * C1 controls and DEL, the zero-width space, word joiner and invisible
- * operators, BOM, and every bidi mark, embedding, override and isolate.
- * Stripped rather than refused — a stray one from a paste should not cost
- * someone their message.
- *
- * U+200C and U+200D (the zero-width non-joiner and joiner) are deliberately
- * kept: the joiner is what holds 🧙‍♂️ and 🏳️‍🌈 together, and both shape real
- * text in several scripts.
- */
-const INVISIBLE =
-  /[\u0000-\u001F\u007F-\u009F\u061C\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g;
-
-/**
  * There is deliberately no blocklist of code-looking text: `<3` and `>inv`
  * are banter. Rendering through textContent is the injection defence.
  */
 export function validateMessage(raw: unknown): Result<string> {
   if (typeof raw !== "string") return bad("A message has to be text.");
-  const text = raw
-    .normalize("NFC")
-    // Line and paragraph separators, tabs and newlines become spaces before
-    // the strip, so a pasted two-liner keeps its word break.
-    .replace(/[\t\n\v\f\r\u0085\u2028\u2029]/g, " ")
-    .replace(INVISIBLE, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (text === "") return bad("Type something first.");
+  const text = cleanText(raw);
+  if (text === "" || !/[\p{L}\p{N}\p{P}\p{S}]/u.test(text)) return bad("Type something first.");
   if (text.length > CHAT_MAX) return bad(`Messages are at most ${CHAT_MAX} characters.`);
   return ok(text);
 }
@@ -124,7 +153,7 @@ export interface ItemCheck {
  * on its own.
  */
 export function checkItems(raw: readonly string[]): ItemCheck {
-  const items = raw.map((s) => s.replace(/\s+/g, " ").trim());
+  const items = raw.map((s) => cleanText(s));
   const problems: ItemProblem[] = [];
   const warnings: ItemProblem[] = [];
   const firstSeen = new Map<string, number>();

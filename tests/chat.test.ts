@@ -193,7 +193,7 @@ test("a version 2 database gains chat, and its games start at chat_seq 0", () =>
   old.close();
 
   const db = openDatabase(file);
-  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 4);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 5);
   assert.equal((db.prepare("SELECT chat_seq FROM games WHERE id = 'a-b-c'").get() as { chat_seq: number }).chat_seq, 0);
   assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE name = 'messages'").get());
   db.close();

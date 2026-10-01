@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   normalizeCharName, charNameKey, validateCharName, validateTitle,
-  checkItems, ITEM_MAX, ITEM_SOFT_MAX,
+  checkItems, cleanText, validateMessage, ITEM_MAX, ITEM_SOFT_MAX,
 } from "../shared/validate.ts";
 
 test("names collide case-insensitively and across whitespace", () => {
@@ -79,4 +79,53 @@ test("over the soft cap warns; over the hard cap fails", () => {
   r = checkItems(list);
   assert.equal(r.ok, false);
   assert.equal(r.problems[0]?.kind, "too-long");
+});
+
+test("names that only look alike collide, whatever is hidden in them (#11)", () => {
+  const base = charNameKey("Thalgrim");
+  const hidden = [
+    "Thalgrim​", "Thal­grim", "Thal‍grim", "⁦Thalgrim⁩", "Thalgrim️",
+    "Thal͏grim", "Thalgrim\u{E0041}", "﻿Thalgrim", "Thal\u0000grim",
+    "Ｔｈａｌｇｒｉｍ",                       // fullwidth, folded by NFKC
+  ];
+  for (const name of hidden) {
+    assert.equal(charNameKey(name), base, JSON.stringify(name));
+    const v = validateCharName(name);
+    assert.ok(v.ok, JSON.stringify(name));
+    assert.ok(!/[​­‍⁦⁩️͏﻿\u0000]/u.test(v.value), "display name is clean too");
+  }
+  // Precomposed and decomposed accents are one name.
+  assert.equal(charNameKey("Thalgrím"), charNameKey("Thalgrím"));
+  // But a real accent is still a different name.
+  assert.notEqual(charNameKey("Thalgrím"), base);
+});
+
+test("a name made of nothing visible, or mixing look-alike alphabets, is refused (#11)", () => {
+  for (const blank of ["ㅤ", "​​", "⠀", "️", "ᅟᅠ", "‮"]) {
+    assert.equal(validateCharName(blank).ok, false, JSON.stringify(blank));
+  }
+  assert.equal(validateCharName("Thаlgrim").ok, false, "Cyrillic а among Latin");
+  assert.equal(validateCharName("Thalgrιm").ok, false, "Greek ι among Latin");
+  for (const fine of ["Thalgrim", "Тальгрим", "Θάλγκριμ", "Thalgrím", "Bonkgrog2"]) {
+    assert.ok(validateCharName(fine).ok, fine);
+  }
+});
+
+test("a direction override cannot reach a name, title or square (#11)", () => {
+  const rlo = "‮mirglaht";
+  assert.equal(normalizeCharName(rlo), "mirglaht");
+  const title = validateTitle("Tuesday ‮BT run‬");
+  assert.ok(title.ok && title.value === "Tuesday BT run");
+  const check = checkItems(Array.from({ length: 24 }, (_, i) => `square ${i}⁧`));
+  assert.ok(check.items.every((s) => !s.includes("⁧")));
+});
+
+test("free text keeps emoji joiners and presentation selectors; names do not (#11)", () => {
+  const wizard = "\u{1F9D9}‍♂️";
+  assert.equal(cleanText(`gz ${wizard}`), `gz ${wizard}`);
+  assert.equal(cleanText(`gz ${wizard}`, "name"), "gz \u{1F9D9}♂");
+  // And the wider strip set reaches chat too.
+  const msg = validateMessage("a­ㅤ\u{E0041}b");
+  assert.ok(msg.ok && msg.value === "ab");
+  assert.equal(validateMessage("ㅤ‌‍").ok, false, "a message of nothing visible");
 });

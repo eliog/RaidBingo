@@ -183,7 +183,7 @@ test("a version 3 database gains a theme, and existing players follow their devi
   old.close();
 
   const db = openDatabase(file);
-  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 4);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 5);
   assert.equal((db.prepare("SELECT theme FROM players WHERE pid = 'p'").get() as { theme: string }).theme, "auto");
   db.close();
   // Safe to run twice.
@@ -195,4 +195,31 @@ test("a player's theme round-trips, and starts on auto", async () => {
   assert.equal((await repo.upsertPlayer("p", T0)).theme, "auto");
   await repo.setTheme("p", "dark");
   assert.equal((await repo.getPlayer("p"))?.theme, "dark");
+});
+
+test("a version 4 database has its name keys recomputed, and a clash keeps both seats (#11)", () => {
+  const file = `/tmp/rb-migrate5-${process.pid}-${Date.now()}.db`;
+  const old = new DatabaseSync(file);
+  old.exec(`CREATE TABLE game_players (
+      game_id TEXT NOT NULL, pid TEXT NOT NULL, char_name TEXT NOT NULL,
+      char_name_key TEXT NOT NULL, board_json TEXT NOT NULL,
+      joined_at INTEGER NOT NULL, bingo_at INTEGER, can_call INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (game_id, pid)) STRICT;
+    CREATE UNIQUE INDEX game_players_name ON game_players(game_id, char_name_key);
+    PRAGMA user_version = 4;`);
+  const add = old.prepare("INSERT INTO game_players VALUES (?, ?, ?, ?, '[]', ?, NULL, 0)");
+  add.run("g", "real", "Thalgrim", "thalgrim", T0);
+  add.run("g", "copy", "Thalgrim​", "thalgrim​", T0 + 1);   // the old key let this in
+  add.run("g", "wide", "Ｂｏｎｋ", "ｂｏｎｋ", T0 + 2);
+  old.close();
+
+  const db = openDatabase(file);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 5);
+  const key = (pid: string) => (db.prepare("SELECT char_name_key AS k FROM game_players WHERE pid = ?").get(pid) as { k: string }).k;
+  assert.equal(key("real"), "thalgrim");
+  assert.equal(key("wide"), "bonk");
+  assert.equal(key("copy"), "thalgrim​", "the later clash keeps its old key rather than failing the migration");
+  assert.equal((db.prepare("SELECT COUNT(*) AS n FROM game_players").get() as { n: number }).n, 3);
+  db.close();
+  openDatabase(file).close();   // safe to run twice
 });

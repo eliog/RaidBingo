@@ -401,3 +401,14 @@ test("someone holding only the link sees the join screen, not the night (#8)", a
   const owner = await h2.service.view(OWNER, h2.gameId);
   assert.ok(owner.ok && owner.value.items.length === ITEM_COUNT && owner.value.isOwner);
 });
+
+test("joining as a look-alike of someone already in the game is refused (#11)", async () => {
+  const h = await withGame();
+  assert.ok((await h.service.joinGame(ALICE, h.gameId, "Thalgrim")).ok);
+  for (const fake of ["Thalgrim​", "Thal­grim", "⁦Thalgrim", "ＴＨＡＬＧＲＩＭ"]) {
+    const r = await h.service.joinGame(BOB, h.gameId, fake);
+    assert.equal(r.ok ? "joined" : r.error.code, "name_taken", JSON.stringify(fake));
+  }
+  const cyrillic = await h.service.joinGame(BOB, h.gameId, "Thаlgrim");
+  assert.equal(cyrillic.ok ? "joined" : cyrillic.error.code, "invalid");
+});

@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS messages (
 ) STRICT;
 `;
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 /**
  * Schema changes have to reach databases that already hold real games, so
@@ -120,6 +120,17 @@ function migrate(db: DatabaseSync): void {
     if (!columns.some((c) => String(c["name"]) === "theme")) {
       db.exec("ALTER TABLE players ADD COLUMN theme TEXT NOT NULL DEFAULT 'auto'");
     }
+  }
+
+  // The uniqueness key gained NFKC and invisible-character stripping (#11),
+  // so keys written before it are recomputed. OR IGNORE: if two existing
+  // players now share a key — the impersonation this closes — both keep
+  // their seats and the later one keeps its old key, rather than the
+  // migration failing on the unique index and taking the app down.
+  if (from < 5) {
+    const rows = db.prepare("SELECT game_id, pid, char_name FROM game_players ORDER BY joined_at").all() as Row[];
+    const rekey = db.prepare("UPDATE OR IGNORE game_players SET char_name_key = ? WHERE game_id = ? AND pid = ?");
+    for (const r of rows) rekey.run(charNameKey(String(r["char_name"])), String(r["game_id"]), String(r["pid"]));
   }
 
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
