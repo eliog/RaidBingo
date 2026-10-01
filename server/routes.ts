@@ -8,6 +8,7 @@ import { isWellFormedId } from "../shared/ids.ts";
 import { ITEM_COUNT, FREE_CELL } from "../shared/board.ts";
 import { ogPng, ogTags, type OgState } from "./og.ts";
 import { loadPresets } from "./presets.ts";
+import { isTheme, type Theme } from "../shared/validate.ts";
 
 const STATUS: Record<ServiceError["code"], number> = {
   not_found: 404,
@@ -57,10 +58,12 @@ async function ogState(deps: Deps, id: string): Promise<OgState | null> {
   };
 }
 
-function page(title: string, state: unknown, head?: string): string {
+function page(title: string, state: { theme?: Theme; [key: string]: unknown }, head?: string): string {
   // layout() escapes; escaping here too would double-encode an & in a title.
   const full = title === "Raid Bingo" ? title : `${title} — Raid Bingo`;
-  return layout({ title: full, body: '<div id="app"></div>', state, module: "app.js", head });
+  return layout({
+    title: full, body: '<div id="app"></div>', state, module: "app.js", head, theme: state.theme,
+  });
 }
 
 export function registerRoutes(app: FastifyInstance, deps: Deps): void {
@@ -108,7 +111,9 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
     const player = await deps.repo.getPlayer(pid);
     const lobby = await service.lobby(pid);
     return reply.type("text/html").send(
-      page("Your games", { view: "lobby", lastName: player?.lastNameUsed ?? null, ...lobby }),
+      page("Your games", {
+        view: "lobby", lastName: player?.lastNameUsed ?? null, theme: player?.theme ?? "auto", ...lobby,
+      }),
     );
   });
 
@@ -120,6 +125,7 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
       page("New game", {
         view: "create",
         lastName: player?.lastNameUsed ?? null,
+        theme: player?.theme ?? "auto",
         itemCount: ITEM_COUNT,
         presets: await loadPresets(),
         previous: await service.previousItemSets(pid),
@@ -169,6 +175,7 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
       page(view.value.title, {
         view: view.value.board === null ? "join" : "board",
         lastName: player?.lastNameUsed ?? null,
+        theme: player?.theme ?? "auto",
         calledCount: calls.size,
         game: view.value,
       }, (await ogState(deps, id).then((s) => (s ? ogTags(s, deps.config.baseUrl) : undefined)))),
@@ -188,6 +195,18 @@ export function registerRoutes(app: FastifyInstance, deps: Deps): void {
   });
 
   // ------------------------------------------------------------------ api
+
+  // Kept on the player, not the browser, so it follows them to a new device.
+  app.post<{ Body: { theme?: unknown } }>("/api/me/theme", async (request, reply) => {
+    const pid = await requirePid(request, reply);
+    if (pid === null) return reply;
+    const theme = request.body?.theme;
+    if (!isTheme(theme)) {
+      return fail(reply, { code: "invalid", message: "Pick auto, light or dark." });
+    }
+    await deps.repo.setTheme(pid, theme);
+    return reply.send({ ok: true, theme });
+  });
 
   app.get<{ Params: { id: string } }>("/api/games/:id", async (request, reply) => {
     const pid = await requirePid(request, reply);

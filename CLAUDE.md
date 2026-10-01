@@ -230,7 +230,7 @@ Vitest dependency.
 
 ## Data model
 
-    players(pid, last_name_used, created_at, last_seen)
+    players(pid, last_name_used, theme, created_at, last_seen)
     sessions(token_hash, pid, created_at, expires_at)
     games(id, title, owner_pid, items_json, created_at, closed_at, chat_seq)
     game_players(game_id, pid, char_name, board_json, joined_at, bingo_at, can_call)
@@ -240,6 +240,9 @@ Vitest dependency.
 - `calls` holds one row per called item: a square is called iff the row exists, and undo is
   a plain delete.
 - `char_name` lives on `game_players`, not `players`, because people bring alts.
+- `theme` is `auto`, `light` or `dark`, chosen from the name menu. It lives on `players`
+  so it follows the person to a new device, and the server writes it onto `<html>` so a
+  forced scheme paints on the first frame. Signed-out pages always follow the device.
 - Message `seq` is per game, issued from `games.chat_seq` by `UPDATE ... RETURNING` in the
   insert's transaction. The same SQL is correct on Postgres, where `MAX(seq) + 1` would
   collide; a global id was rejected because its gaps leak how busy other games are. A

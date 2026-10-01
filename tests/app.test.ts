@@ -390,3 +390,36 @@ test("a full chat is a 409 with its own code, not a 429", async () => {
   assert.equal(res.statusCode, 409);
   assert.equal((res.json() as { error: { code: string } }).error.code, "full");
 });
+
+test("the theme choice is stored on the player and painted from the first frame", async () => {
+  const h = app();
+  const cookie = await signIn(h);
+  const before = await h.instance.inject({ method: "GET", url: "/", headers: { cookie } });
+  assert.match(before.body, /<html lang="en">/, "auto leaves the device in charge");
+  assert.match(before.body, /theme-color" media="\(prefers-color-scheme: dark\)"/);
+
+  const set = await h.instance.inject({
+    method: "POST", url: "/api/me/theme", headers: { cookie }, payload: { theme: "light" },
+  });
+  assert.equal(set.statusCode, 200);
+
+  // A new device is just a new session for the same pid.
+  const elsewhere = await signIn(h);
+  const after = await h.instance.inject({ method: "GET", url: "/", headers: { cookie: elsewhere } });
+  assert.match(after.body, /<html lang="en" data-theme="light">/);
+  assert.match(after.body, /<meta name="theme-color" content="#E8DFC8">/);
+  assert.match(after.body, /"theme":"light"/);
+});
+
+test("a theme outside the three choices is refused, and so is an anonymous one", async () => {
+  const h = app();
+  const cookie = await signIn(h);
+  for (const theme of ["purple", "", null, 1, '" onload="x']) {
+    const res = await h.instance.inject({
+      method: "POST", url: "/api/me/theme", headers: { cookie }, payload: { theme },
+    });
+    assert.equal(res.statusCode, 400, String(theme));
+  }
+  const anon = await h.instance.inject({ method: "POST", url: "/api/me/theme", payload: { theme: "dark" } });
+  assert.equal(anon.statusCode, 401);
+});

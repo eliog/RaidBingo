@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import { openDatabase, createRepository } from "../server/db.ts";
 import type { Repository } from "../server/ports.ts";
 import { dealBoard } from "../shared/board.ts";
@@ -170,4 +171,28 @@ test("previous item sets come back newest first, for reuse when creating a game"
   const sets = await repo.previousItemSets("owner", 10);
   assert.deepEqual(sets.map((g) => g.title), ["Later night", "Tuesday BT run"]);
   assert.equal((await repo.previousItemSets("player", 10)).length, 0);
+});
+
+test("a version 3 database gains a theme, and existing players follow their device", () => {
+  const file = `/tmp/rb-migrate4-${process.pid}-${Date.now()}.db`;
+  const old = new DatabaseSync(file);
+  old.exec(`CREATE TABLE players (pid TEXT PRIMARY KEY, last_name_used TEXT,
+      created_at INTEGER NOT NULL, last_seen INTEGER NOT NULL) STRICT;
+    PRAGMA user_version = 3;`);
+  old.prepare("INSERT INTO players VALUES (?, ?, ?, ?)").run("p", "Thalgrim", T0, T0);
+  old.close();
+
+  const db = openDatabase(file);
+  assert.equal((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version, 4);
+  assert.equal((db.prepare("SELECT theme FROM players WHERE pid = 'p'").get() as { theme: string }).theme, "auto");
+  db.close();
+  // Safe to run twice.
+  openDatabase(file).close();
+});
+
+test("a player's theme round-trips, and starts on auto", async () => {
+  const repo = createRepository(openDatabase(":memory:"));
+  assert.equal((await repo.upsertPlayer("p", T0)).theme, "auto");
+  await repo.setTheme("p", "dark");
+  assert.equal((await repo.getPlayer("p"))?.theme, "dark");
 });

@@ -5,6 +5,8 @@
  * markup, so `esc` is not optional anywhere.
  */
 
+import type { Theme } from "../shared/validate.ts";
+
 const ESCAPES: Record<string, string> = {
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 };
@@ -31,6 +33,26 @@ export interface LayoutOptions {
   /** Serialised state for the client, exposed as window.__RB__. */
   state?: unknown;
   module?: string | undefined;
+  /** The signed-in player's choice. Absent means follow the device. */
+  theme?: Theme | undefined;
+}
+
+/** Browser chrome colour, matching --bg in each scheme. */
+const CHROME = { light: "#E8DFC8", dark: "#14101A" } as const;
+
+/**
+ * Set on <html> in the markup, not by script after load, so a forced scheme
+ * paints right on the first frame instead of flashing the device's.
+ */
+function themeHead(theme: Theme): { attr: string; meta: string } {
+  if (theme === "auto") {
+    return {
+      attr: "",
+      meta: `<meta name="theme-color" media="(prefers-color-scheme: light)" content="${CHROME.light}">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="${CHROME.dark}">`,
+    };
+  }
+  return { attr: ` data-theme="${theme}"`, meta: `<meta name="theme-color" content="${CHROME[theme]}">` };
 }
 
 export function layout(opts: LayoutOptions): string {
@@ -41,13 +63,14 @@ export function layout(opts: LayoutOptions): string {
     ? ""
     : `<script type="module" src="/assets/${esc(opts.module)}"></script>`;
 
+  const theme = themeHead(opts.theme ?? "auto");
   return `<!doctype html>
-<html lang="en">
+<html lang="en"${theme.attr}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>${esc(opts.title)}</title>
-<meta name="theme-color" content="#14101A">
+${theme.meta}
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

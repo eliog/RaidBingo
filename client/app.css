@@ -70,9 +70,14 @@ p{margin:0}
 .wordmark span{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:15px;letter-spacing:.09em;text-transform:uppercase}
 .chip{font-family:Cinzel,Georgia,serif;font-weight:700;font-size:15px;background:none;border:0;color:var(--ink);cursor:pointer;padding:6px 4px}
 .chip.anon{font-family:inherit;font-weight:400;color:var(--ink-dim)}
-.menu{position:absolute;top:52px;right:12px;min-width:150px;background:var(--raised);border:1px solid var(--line);border-radius:3px;box-shadow:var(--shadow);padding:5px;z-index:40}
+.menu{position:absolute;top:52px;right:12px;min-width:200px;background:var(--raised);border:1px solid var(--line);border-radius:3px;box-shadow:var(--shadow);padding:5px;z-index:40}
 .menu button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--ink);font:inherit;padding:8px 10px;border-radius:2px;cursor:pointer}
 .menu button:hover{background:var(--surface);color:var(--fel)}
+.menu .themes{border-block:1px solid var(--line);margin-block:4px;padding:8px 10px 9px;display:flex;flex-direction:column;gap:6px}
+.menu .seg{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.menu .seg button{flex:1;text-align:center;padding:5px 8px;border-radius:0;font-size:13.5px;color:var(--ink-dim)}
+.menu .seg button+button{border-left:1px solid var(--line)}
+.menu .seg button[aria-checked="true"]{background:var(--fel-wash);color:var(--ink);font-weight:700}
 
 /* -------------------------------------------------------------- controls */
 .btn{

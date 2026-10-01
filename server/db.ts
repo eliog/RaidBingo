@@ -23,12 +23,13 @@ import { DatabaseSync } from "node:sqlite";
 import type {
   Repository, PlayerRow, GameRow, GamePlayerRow, SessionRow, MessageRow,
 } from "./ports.ts";
-import { charNameKey } from "../shared/validate.ts";
+import { charNameKey, isTheme } from "../shared/validate.ts";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS players (
   pid            TEXT PRIMARY KEY,
   last_name_used TEXT,
+  theme          TEXT NOT NULL DEFAULT 'auto',
   created_at     INTEGER NOT NULL,
   last_seen      INTEGER NOT NULL
 ) STRICT;
@@ -86,7 +87,7 @@ CREATE TABLE IF NOT EXISTS messages (
 ) STRICT;
 `;
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 /**
  * Schema changes have to reach databases that already hold real games, so
@@ -114,6 +115,13 @@ function migrate(db: DatabaseSync): void {
     }
   }
 
+  if (from < 4) {
+    const columns = db.prepare("PRAGMA table_info(players)").all() as { name?: unknown }[];
+    if (!columns.some((c) => String(c["name"]) === "theme")) {
+      db.exec("ALTER TABLE players ADD COLUMN theme TEXT NOT NULL DEFAULT 'auto'");
+    }
+  }
+
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -136,6 +144,8 @@ const maybeStr = (v: unknown): string | null => (v === null || v === undefined ?
 const toPlayer = (r: Row): PlayerRow => ({
   pid: str(r["pid"]),
   lastNameUsed: maybeStr(r["last_name_used"]),
+  // A value this build does not know falls back to following the device.
+  theme: isTheme(r["theme"]) ? r["theme"] : "auto",
   createdAt: num(r["created_at"]),
   lastSeen: num(r["last_seen"]),
 });
@@ -183,6 +193,7 @@ export function createRepository(db: DatabaseSync): Repository {
        ON CONFLICT(pid) DO UPDATE SET last_seen = excluded.last_seen`),
     getPlayer: db.prepare(`SELECT * FROM players WHERE pid = ?`),
     setLastName: db.prepare(`UPDATE players SET last_name_used = ? WHERE pid = ?`),
+    setTheme: db.prepare(`UPDATE players SET theme = ? WHERE pid = ?`),
 
     createSession: db.prepare(
       `INSERT INTO sessions (token_hash, pid, created_at, expires_at) VALUES (?, ?, ?, ?)`),
@@ -254,6 +265,10 @@ export function createRepository(db: DatabaseSync): Repository {
     },
     async setLastNameUsed(pid, name) {
       q.setLastName.run(name, pid);
+    },
+
+    async setTheme(pid, theme) {
+      q.setTheme.run(theme, pid);
     },
 
     async createSession(row) {

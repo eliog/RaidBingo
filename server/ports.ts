@@ -4,6 +4,8 @@
  * needs a database file on disk.
  */
 
+import type { Theme } from "../shared/validate.ts";
+
 /** What we ask Discord for, and the only thing we take back. */
 export interface DiscordPort {
   /** The url to send the browser to. `state` is echoed back to the callback. */
@@ -22,6 +24,7 @@ export interface DiscordPort {
 export interface PlayerRow {
   pid: string;
   lastNameUsed: string | null;
+  theme: Theme;
   createdAt: number;
   lastSeen: number;
 }
@@ -76,6 +79,7 @@ export interface Repository {
   upsertPlayer(pid: string, now: number): Promise<PlayerRow>;
   getPlayer(pid: string): Promise<PlayerRow | null>;
   setLastNameUsed(pid: string, name: string): Promise<void>;
+  setTheme(pid: string, theme: Theme): Promise<void>;
 
   createSession(row: SessionRow): Promise<void>;
   findSession(tokenHash: string, now: number): Promise<SessionRow | null>;

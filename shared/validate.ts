@@ -16,6 +16,11 @@ export const TITLE_MAX = 40;
 export const ITEM_MAX = 60;
 export const ITEM_SOFT_MAX = 48;
 
+/** Colour scheme. "auto" follows the device, so it is the default. */
+export const THEMES = ["auto", "light", "dark"] as const;
+export type Theme = (typeof THEMES)[number];
+export const isTheme = (v: unknown): v is Theme => (THEMES as readonly unknown[]).includes(v);
+
 export type Valid<T> = { ok: true; value: T };
 export type Invalid = { ok: false; reason: string };
 export type Result<T> = Valid<T> | Invalid;

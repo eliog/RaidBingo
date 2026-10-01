@@ -63,6 +63,7 @@ function masthead() {
     if (menu) { menu.remove(); menu = null; return; }
     menu = h("div", { class: "menu", role: "menu" },
       h("button", { onclick: () => { location.href = "/"; } }, "Your games"),
+      themePicker(),
       h("button", { onclick: async () => {
         const f = h("form", { method: "POST", action: "/auth/logout" });
         document.body.append(f); f.submit();
@@ -72,6 +73,39 @@ function masthead() {
   return h("header", { class: "masthead" },
     h("a", { class: "wordmark", href: "/" }, mark(26), h("span", null, "Raid Bingo")),
     h("div", { class: "spacer" }), chip);
+}
+
+/* ---------------------------------------------------------------- theme */
+const CHROME = { light: "#E8DFC8", dark: "#14101A" };
+let theme = S.theme ?? "auto";
+
+/** Mirrors themeHead() in server/html.ts, so a change lands without a reload. */
+function applyTheme(t) {
+  const html = document.documentElement;
+  if (t === "auto") html.removeAttribute("data-theme"); else html.dataset.theme = t;
+  for (const m of document.querySelectorAll('meta[name="theme-color"]')) m.remove();
+  const metas = t === "auto"
+    ? [["(prefers-color-scheme: light)", CHROME.light], ["(prefers-color-scheme: dark)", CHROME.dark]]
+    : [[null, CHROME[t]]];
+  for (const [media, content] of metas) document.head.append(h("meta", { name: "theme-color", media, content }));
+}
+
+function themePicker() {
+  const opts = [["auto", "Auto"], ["light", "Light"], ["dark", "Dark"]];
+  const buttons = opts.map(([value, label]) => h("button", {
+    role: "menuitemradio", "aria-checked": String(value === theme),
+    title: value === "auto" ? "Follow this device" : null,
+    onclick: async (e) => {
+      e.stopPropagation();                     // keep the menu open to show the tick
+      if (value === theme) return;
+      const was = theme;
+      theme = value; applyTheme(value); tick();
+      try { await api("/api/me/theme", { theme: value }); }
+      catch (err) { theme = was; applyTheme(was); tick(); toast(err.message, { kind: "warn" }); }
+    } }, label));
+  const tick = () => buttons.forEach((b, i) => b.setAttribute("aria-checked", String(opts[i][0] === theme)));
+  return h("div", { class: "themes", role: "group", "aria-label": "Theme" },
+    h("span", { class: "eyebrow" }, "Theme"), h("div", { class: "seg" }, buttons));
 }
 
 function mark(size) {
