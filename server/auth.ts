@@ -124,12 +124,23 @@ export function registerAuthRoutes(app: FastifyInstance, deps: Deps): void {
     return reply.redirect(returnTo, 302);
   });
 
-  app.post("/auth/logout", async (request, reply) => {
-    const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
-    if (token !== undefined && token !== "") {
-      await deps.repo.deleteSession(hashSessionToken(token));
-    }
-    clearSessionCookie(reply, secure);
-    return reply.redirect("/", 302);
+  // Logout is a plain <form method=POST>, which browsers send as urlencoded.
+  // Fastify refuses a type it has no parser for, so this scope accepts it and
+  // ignores the (empty) body. Encapsulated: the api still demands json.
+  void app.register(async (scope) => {
+    scope.addContentTypeParser(
+      "application/x-www-form-urlencoded",
+      { parseAs: "string", bodyLimit: 1024 },
+      (_request, _body, done) => done(null, {}),
+    );
+
+    scope.post("/auth/logout", async (request, reply) => {
+      const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
+      if (token !== undefined && token !== "") {
+        await deps.repo.deleteSession(hashSessionToken(token));
+      }
+      clearSessionCookie(reply, secure);
+      return reply.redirect("/", 302);
+    });
   });
 }

@@ -121,6 +121,30 @@ test("logging out clears the cookie and the session row", async () => {
   assert.equal(after.statusCode, 401);
 });
 
+test("logging out works from the real form, which a browser sends as urlencoded", async () => {
+  // The menu submits an empty <form method=POST>. Browsers label that
+  // application/x-www-form-urlencoded, which inject() does not do by default.
+  const h = app();
+  const cookie = await signIn(h);
+  const out = await h.instance.inject({
+    method: "POST", url: "/auth/logout", payload: "",
+    headers: { cookie, "content-type": "application/x-www-form-urlencoded" },
+  });
+  assert.equal(out.statusCode, 302);
+  const after = await h.instance.inject({ method: "GET", url: "/api/games/a-b-c", headers: { cookie } });
+  assert.equal(after.statusCode, 401);
+});
+
+test("the urlencoded allowance stops at logout; the api still demands json", async () => {
+  const h = app();
+  const cookie = await signIn(h);
+  const res = await h.instance.inject({
+    method: "POST", url: "/api/games", payload: "title=x",
+    headers: { cookie, "content-type": "application/x-www-form-urlencoded" },
+  });
+  assert.equal(res.statusCode, 415);
+});
+
 test("a title with an ampersand is escaped exactly once", async () => {
   const h = app();
   const cookie = await signIn(h);
