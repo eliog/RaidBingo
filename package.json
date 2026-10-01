@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
-    "fastify": "^5.2.0",
+    "fastify": "^5.12.5",
     "ws": "^8.18.0"
   },
   "devDependencies": {
