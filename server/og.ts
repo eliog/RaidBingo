@@ -30,8 +30,16 @@ export interface OgState {
 }
 
 /** SVG has no entity table beyond the basics; a bare & breaks the document. */
+/**
+ * Escaped, and stripped of what XML 1.0 forbids outright — controls other
+ * than tab and newline, lone surrogates, U+FFFE/FFFF — which make resvg fail
+ * the whole image. New text can't contain them (cleanText), but titles saved
+ * before that can. Other noncharacters are legal XML and render as nothing.
+ */
+const XML_INVALID = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|\p{Cs}/gu;
+
 function xml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) =>
+  return value.replace(XML_INVALID, "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c] as string);
 }
 

@@ -129,3 +129,14 @@ test("free text keeps emoji joiners and presentation selectors; names do not (#1
   assert.ok(msg.ok && msg.value === "ab");
   assert.equal(validateMessage("ㅤ‌‍").ok, false, "a message of nothing visible");
 });
+
+test("noncharacters and lone surrogates never get into stored text (#17)", () => {
+  // Built from code points: a literal noncharacter or lone surrogate in the
+  // source trips Node's type stripper.
+  const t = validateTitle(["BT", "\uFFFE", " run", "\uD800", " ", "\uFDD0", "night", "\uDBFF", "\u{10FFFF}"].join(""));
+  assert.ok(t.ok && t.value === "BT run night", JSON.stringify(t));
+  // A real surrogate pair is an emoji, and stays.
+  assert.equal(cleanText("gz \u{1F525}"), "gz \u{1F525}");
+  const n = validateCharName("Thal\uFFFFgrim");
+  assert.ok(n.ok && n.value === "Thalgrim");
+});

@@ -89,3 +89,16 @@ test("a failed render is not cached, and the cache stays bounded", async () => {
   await small({ ...live, calls: 1 });
   assert.equal(count, 4, "the oldest entry was evicted");
 });
+
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
+test("titles with characters XML forbids still render a preview (#17)", async () => {
+  // Some of these can no longer be typed (#11, #17), but titles saved before
+  // that are still in the database, so the renderer has to cope on its own.
+  for (const title of ["Tues\u0001day", "BT \uFFFE run", "x\uD800y", "end\uDC00", "bell\u0007\u001F", "\uFDD0night"]) {
+    const png = await ogPng({ ...fresh, title });
+    assert.ok(png.subarray(0, 4).equals(PNG), JSON.stringify(title));
+  }
+  assert.ok(!/[\u0001\uFFFE]/.test(ogSvg({ ...fresh, title: "a\u0001\uFFFEb" })));
+  assert.match(ogSvg({ ...fresh, title: "a\u0001\uFFFEb" }), />ab</);
+});

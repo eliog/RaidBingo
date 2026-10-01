@@ -616,3 +616,19 @@ test("a malformed cookie is skipped, not a 500 on every page (#16)", async () =>
   assert.equal(bad.statusCode, 200);
   assert.ok(bad.body.includes('"view":"login"'));
 });
+
+test("an unexpected 500 never shows the internal error, and 4xx keep theirs (#17)", async () => {
+  const h = app();
+  h.instance.get("/boom", async () => { throw new Error("resvg: XML parse error at 1:57 /srv/secret/path"); });
+  const res = await h.instance.inject({ method: "GET", url: "/boom" });
+  assert.equal(res.statusCode, 500);
+  assert.ok(!res.body.includes("resvg") && !res.body.includes("/srv"), res.body);
+  assert.deepEqual(res.json(), { error: { code: "internal", message: "Something went wrong on our side." } });
+
+  // A client mistake still says what was wrong.
+  const cookie = await signIn(h, "1");
+  const big = await h.instance.inject({ method: "POST", url: "/api/games", headers: { cookie, "content-type": "application/json" },
+    payload: "{not json" });
+  assert.equal(big.statusCode, 400);
+  assert.ok(big.body.length > 0 && !big.body.includes("Something went wrong on our side"));
+});

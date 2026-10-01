@@ -27,6 +27,15 @@ export function buildApp(deps: Deps): FastifyInstance {
   const app = Fastify({ logger: false, trustProxy: true });
   const base = new URL(deps.config.baseUrl);
 
+  // A 4xx is about the request and says what was wrong. A 5xx is about us,
+  // and its message can carry internals (a renderer's parse error, a path),
+  // so the client gets a fixed one.
+  app.setErrorHandler(async (error, _request, reply) => {
+    const status = (error as { statusCode?: number }).statusCode ?? 500;
+    if (status < 500) return reply.send(error);
+    return reply.code(500).send({ error: { code: "internal", message: "Something went wrong on our side." } });
+  });
+
   // www is served a certificate too, but the canonical origin is BASE_URL:
   // the session cookie and the OAuth redirect are both pinned to it.
   app.addHook("onRequest", async (request, reply) => {

@@ -35,13 +35,14 @@ const bad = (reason: string): Invalid => ({ ok: false, reason });
  * the tag block — plus the blank fillers and joiners that are letters or marks
  * on paper but draw nothing: Hangul fillers, the braille blank, the combining
  * grapheme joiner, Khmer inherent vowels, Mongolian selectors and the
- * variation selectors.
+ * variation selectors. Lone surrogates (Cs) and noncharacters go too: they
+ * are not text, and XML refuses them, which broke the link preview (#17).
  *
  * Stripped rather than refused: a stray one from a paste should not cost
  * someone their message.
  */
 const INVISIBLE =
-  /[\p{Cc}\p{Cf}\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180F\u2800\u3164\uFE00-\uFE0F\uFFA0\u{E0100}-\u{E01EF}]/gu;
+  /[\p{Cc}\p{Cf}\p{Cs}\p{Noncharacter_Code_Point}\u034F\u115F\u1160\u17B4\u17B5\u180B-\u180F\u2800\u3164\uFE00-\uFE0F\uFFA0\u{E0100}-\u{E01EF}]/gu;
 
 /**
  * Kept in free text (chat, titles, squares), never in a name. The joiners
